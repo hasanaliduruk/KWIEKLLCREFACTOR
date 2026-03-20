@@ -32,3 +32,31 @@ def on_click_outside(event, text_widgets, placeholder_default, inactive_color="#
         except (AttributeError, tk.TclError):
             # Yalnızca beklenen GUI nesnesi hataları görmezden gelinir
             pass
+
+def on_mouse_wheel(event, canvas):
+    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+def on_text_enter(event, canvas):
+    canvas.unbind_all("<MouseWheel>")
+
+def on_text_leave(event, canvas):
+    canvas.bind_all("<MouseWheel>", lambda e: on_mouse_wheel(e, canvas))
+def on_button_click(option_menu):
+    option_menu.toggle()
+def button_hover(event, button, dictionary, button_5, program_icon_hover, home_icon_hover):
+    if dictionary[button] == 0 and button != button_5:
+        button.config(background='#3C4043', image=program_icon_hover)
+    elif dictionary[button] == 0 and button == button_5:
+        button.config(background='#3C4043', image=home_icon_hover)
+def button_leave(event, button, dictionary, color, button_5, program_icon_notselected, home_icon_notselected):
+    if dictionary[button] == 0 and button != button_5:
+        button.config(background=color, image=program_icon_notselected)
+    elif dictionary[button] == 0 and button == button_5:
+        button.config(background=color, image=home_icon_notselected)
+def show_menu(event, options, var, button, window, color, canvas2_text_color, line_color):
+    # Menü oluşturma
+    menu = tk.Menu(window, borderwidth=0, activeborderwidth=0, relief="flat", tearoff=2, background=color, fg=canvas2_text_color, activebackground=line_color, cursor="hand2")
+
+    for option in options:
+        menu.add_command(label=option, command=lambda opt=option: var.set(opt))
+    menu.post(button.winfo_rootx(), button.winfo_rooty()+button.winfo_height())

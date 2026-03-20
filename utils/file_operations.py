@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 from tkinter import filedialog
+from pathlib import Path
 
 def browse_directory(text_widget, parent_window, text_color='#E3E3E3'):
     folder_selected = filedialog.askdirectory(parent=parent_window)
@@ -83,3 +84,12 @@ def path_text_function(name, path_text, placeholder, save_text: tk.Text = None, 
     if save_text is not None and len(memorytext) > 1:
         memorysavename = memorytext[1].strip('\n')
         save_text.insert("1.0", memorysavename)
+
+def relative_to_assets(path: str) -> Path:
+    OUTPUT_PATH = Path(__file__).resolve().parent.parent
+    ASSETS_PATH = OUTPUT_PATH / "assets" / "frame0"
+    return ASSETS_PATH / path
+
+def write_settings(isim, settings_var):
+    with open(isim, 'w', encoding='utf-8') as file:
+        file.write(settings_var)

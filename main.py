@@ -3,15 +3,18 @@ This project made by HASAN ALI DURUK
 Duruk/'s Software LLC
 """
 
-from utils.gui_helpers import open_folder_in_explorer, dark_title_bar, Error_box, text_print, hata_print
-from utils.file_operations import browse_directory, browse_excel, placeholder_finder, placeholder_saver, save_location_saver, path_text_function
-from utils.event_handlers import on_focus_in, on_focus_out, on_click_outside
+from utils.gui_helpers import open_folder_in_explorer, dark_title_bar, Error_box, text_print, hata_print, silici, width_f, smooth_scroll, color_change
+from utils.file_operations import browse_directory, browse_excel, placeholder_finder, placeholder_saver, save_location_saver, path_text_function, relative_to_assets, write_settings
+from utils.event_handlers import on_focus_in, on_focus_out, on_click_outside, on_mouse_wheel, on_text_enter, on_text_leave, on_button_click, button_hover, button_leave, show_menu
 from gui.components.animated_image import AnimatedImage
 from gui.components.choosers import ConvertChooser, PathAdressGroup
 from gui.components.custom_buttons import MyButton, SwitchButton
 from gui.components.option_menu import CustomOptionMenu
 from gui.components.scrollbar import MyScrollbar
-from core.cost_updater import process_costupdater, process_costupdater2
+from gui.components.round_button import create_round_button
+from gui.components.drag_drop import ham_drag_drop2, drag_drop
+from gui.views.tsv_view import render_tsv_view
+from gui.views.costupdater_view import render_costupdater_view
 from core.invoice_processor import process_invoice
 from core.converter import process_conversion
 from core.order_creator import process_order_create
@@ -43,7 +46,7 @@ from PIL import Image as HASAN
 from PIL import ImageTk, ImageDraw
 
 from tkinter import *
-from tkinter import filedialog
+
 
 from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 import tkinter as tk
@@ -66,141 +69,6 @@ import warnings
 from bs4 import XMLParsedAsHTMLWarning
 import platform
 
-def on_button_click(option_menu):
-    option_menu.toggle()
-def create_round_button(canvas, lenght, height, radius, text, fill_color, text_color, corners= [1, 1, 1, 1], fonksiyon=None, onenter_color='', args=(), outline_widht=1, outline_color='black', active_color='white',canvas_bg='white', active_text_color='black', font=("Helvetica", 12)):
-    button_canvas = tk.Canvas(canvas, height=height+(outline_widht*2)+2, width=lenght+(outline_widht*2)+2, border=0, bg=canvas_bg, highlightthickness=0)
-    if outline_widht == 0:
-        outline_color = ""
-    if onenter_color == '':
-        onenter_color = fill_color
-    if fonksiyon == None:
-        def donothing():
-            pass
-        fonksiyon = donothing
-    button_canvas.pack_propagate(False)
-    x = ((outline_widht*2)+2)/2
-    y = ((outline_widht*2)+2)/2
-    horizontal_rectangle_lenght = lenght-(2*radius)
-    vertical_rectangle_lenght = height-(2*radius)
-    a = horizontal_rectangle_lenght/2
-    # Buton arka planını çiz
-    items = []
-    if corners[0] == 1:
-        oval1 =button_canvas.create_arc(x, y, x+(radius*2), y+(radius*2),start=90, extent=90,style=tk.PIESLICE, fill=fill_color, outline="")
-        oval1_out =button_canvas.create_arc(x, y, x+(radius*2), y+(radius*2),start=90, extent=90,style=tk.ARC, fill=fill_color, outline=outline_color, width=outline_widht)#sol ust oval
-        button_canvas.addtag_withtag("button", oval1_out)
-        button_canvas.addtag_withtag("button", oval1)
-        items.append(oval1)
-    else:
-        rectnw = button_canvas.create_rectangle(x, y, x+(radius*2), y+(radius*2), fill=fill_color, outline="")
-        items.append(rectnw)
-    if corners[1] == 1:
-        oval2 =button_canvas.create_arc(x+lenght-(2*radius)-1, y, x+lenght-1, y+(radius*2),start=360, extent=90,style=tk.PIESLICE, fill=fill_color, outline="") #sag ust oval
-        oval2_out =button_canvas.create_arc(x+lenght-(2*radius), y, x+lenght, y+(radius*2),start=360, extent=90,style=tk.ARC, fill=fill_color, outline=outline_color, width=outline_widht)
-        button_canvas.addtag_withtag("button", oval2_out)
-        button_canvas.addtag_withtag("button", oval2)
-        items.append(oval2)
-    else:
-        rectne= button_canvas.create_rectangle(x+lenght-(2*radius), y, x+lenght, y+(radius*2), fill=fill_color, outline="")
-        items.append(rectne)
-    if corners[2] == 1:
-        oval3 = button_canvas.create_arc(x, y+height, x+(radius*2), y+height-(2*radius),start=180, extent=90,style=tk.PIESLICE, fill=fill_color, outline="") #sol alt oval
-        oval3_out = button_canvas.create_arc(x, y+height, x+(radius*2), y+height-(2*radius),start=180, extent=90,style=tk.ARC, fill=fill_color, outline=outline_color, width=outline_widht) #sol alt oval
-        button_canvas.addtag_withtag("button", oval3_out)
-        button_canvas.addtag_withtag("button", oval3)
-        items.append(oval3)
-    else:
-        rectsw = button_canvas.create_rectangle(x, y+height+1, x+(radius*2), y+height-(2*radius),fill=fill_color, outline="")
-        items.append(rectsw)
-    if corners[3] == 1:
-        oval4 = button_canvas.create_arc(x+lenght-(2*radius)-1, y+height, x+lenght-1, y+height-(2*radius),start=270, extent=90,style=tk.PIESLICE, fill=fill_color, outline="") #sag alt oval
-        oval4_out = button_canvas.create_arc(x+lenght-(2*radius)-1, y+height, x+lenght-1, y+height-(2*radius),start=270, extent=90,style=tk.ARC, fill=fill_color, outline=outline_color, width=outline_widht) #sag alt oval
-        button_canvas.addtag_withtag("button", oval4_out)
-        button_canvas.addtag_withtag("button", oval4)
-        items.append(oval4)
-    else:
-        rectse = button_canvas.create_rectangle(x+lenght-(2*radius), y+height+1, x+lenght, y+height-(2*radius),fill=fill_color, outline="")
-        items.append(rectse)
-    # Dikdörtgenin üst ve alt kenarlarını çiz
-    rectangle = button_canvas.create_rectangle(x+radius, y, x+lenght-radius, y+height+1, outline="", fill=fill_color)
-    line1 = button_canvas.create_line(x+radius, y, x+lenght-radius, y, fill=outline_color, width=outline_widht)  # Üst kenar
-    line2 = button_canvas.create_line(x+radius, y+height, x+lenght-radius, y+height, fill=outline_color, width=outline_widht)  # Alt kenar
-
-    rectangle_horizontal = button_canvas.create_rectangle(x, y+radius, x+lenght, y+height-radius, fill=fill_color, outline="")
-    line3 = button_canvas.create_line(x, y+radius, x, y+height-radius, fill=outline_color, width=outline_widht) # Sol kenar
-    line4 = button_canvas.create_line(x+lenght, y+radius, x+lenght, y+height-radius, fill=outline_color, width=outline_widht) # Sag kenar
-
-
-    button_canvas.addtag_withtag("button", rectangle)
-    button_canvas.addtag_withtag("button", line1)
-    button_canvas.addtag_withtag("button", line2)
-    button_canvas.addtag_withtag("button", rectangle_horizontal)
-    button_canvas.addtag_withtag("button", line3)
-    button_canvas.addtag_withtag("button", line4)
-
-    items.append(rectangle)
-    items.append(rectangle_horizontal)
-    def on_enter(e):
-
-        for item in button_canvas.find_all():
-            if item in items:
-                button_canvas.itemconfig(item, fill=onenter_color)
-    def on_leave(e):
-        for item in button_canvas.find_all():
-            if item in items:
-                button_canvas.itemconfig(item, fill=fill_color)
-    def start_function(fonksiyon, args):
-        return fonksiyon(*args)
-    def on_button_click(e):
-        start_function(fonksiyon, args)
-        for i in button_canvas.find_all():
-            if i in items:
-                button_canvas.itemconfig(i, fill=active_color)
-        button_canvas.itemconfig(text_widget, fill=active_text_color)
-
-    def on_button_release(e):
-        for i in button_canvas.find_all():
-            if i in items:
-                button_canvas.itemconfig(i, fill=fill_color)
-
-        button_canvas.itemconfig(text_widget, fill=text_color)
-
-
-    #button_canvas.create_rectangle(x-rectangle_lenght, y-radius, x+rectangle_lenght, y+radius, fill="lightblue", outline="black")
-    # Buton metnini ekle
-    text_widget = button_canvas.create_text(x+(lenght/2), y+(height/2), text=text, font=font, fill=text_color)
-
-    button_canvas.addtag_withtag("button", text_widget)
-    button_canvas.tag_bind("button", "<Button-1>", on_button_click)
-    button_canvas.tag_bind("button", "<ButtonRelease-1>", on_button_release)
-    button_canvas.tag_bind("button", "<Enter>", on_enter)
-    button_canvas.tag_bind("button", "<Leave>", on_leave)
-    return button_canvas
-
-
-
-
-def color_change(old_color, new_color, window):
-    global color
-    widgets = window.winfo_children()
-    for widget in widgets:
-        if widget.cget("background") == old_color:
-            widget.config(bg=new_color)
-    color = new_color
-
-def on_text_enter(event):
-    canvas2.unbind_all("<MouseWheel>")
-def on_text_leave(event):
-    canvas2.bind_all("<MouseWheel>", on_mouse_wheel)
-
-def show_menu(event, options, var, button, window):
-    # Menü oluşturma
-    menu = Menu(window, borderwidth=0, activeborderwidth=0, relief="flat", tearoff=2, background=color, fg=canvas2_text_color, activebackground=line_color, cursor="hand2")
-
-    for option in options:
-        menu.add_command(label=option, command=lambda opt=option: var.set(opt))
-    menu.post(button.winfo_rootx(), button.winfo_rooty()+button.winfo_height())
 def start_expration_thread(username_entry, password_entry, output_text, path, item_ids):
     t = Thread(target=expration, args=(username_entry, password_entry, output_text, path, item_ids), daemon=True)
     t.start()
@@ -209,21 +77,21 @@ def start_excel_editor_thread(ham_liste,export_liste,restock_liste,path,islem, r
     t = Thread(target=rest, args=(path, ham_liste, export_liste, restock_liste, islem, progress, restock_output, save_name), daemon=True)
     t.start()
 
-
 def find_column(df, possible_columns, Error):
-    """
-    DataFrame'de verilen olası UPC sütun adlarını arar ve ilk bulduğunu döner.
-    Eğer hiçbiri bulunamazsa, None döner.
-    """
+    # DataFrame'de verilen olası UPC sütun adlarını arar ve ilk bulduğunu döner.
+    # Eğer hiçbiri bulunamazsa, None döner.
+    
     for column in possible_columns:
         if column in df.columns:
             return column
 
     messagebox.showerror('Error', 'Error: {}'.format(Error))
     return None
+
 def file_reader(file):
     row_df = pd.read_excel(file, engine='openpyxl')
     return [file, row_df]
+
 def export(liste): #liste must include (path, row, export_files, columns_dict, dataframe_dictionary)
     path = liste[0]
     row = liste[1]
@@ -268,6 +136,7 @@ def export(liste): #liste must include (path, row, export_files, columns_dict, d
 
     row_df.to_excel(r"{}/sonuclar/{}".format(path, savename), index=False, sheet_name='export sonuc', engine='xlsxwriter')
     return [row, row_df]
+
 def birbirinden_dusme_remove(liste): #liste must include [file_name, remove_upc, dataframe_dictionary, path, columns_dictionary]
     file_name = liste[0]
     remove_upc = liste[1]
@@ -287,6 +156,7 @@ def birbirinden_dusme_remove(liste): #liste must include [file_name, remove_upc,
     else:
         dataframe_dictionary[file_name].to_excel(save_path, sheet_name='dusulmus liste', index=False)
     return [file_name, dataframe_dictionary[file_name]]
+
 def rest(path, row_files, export_files, restock_files, islem, progress_bar, output_text, save_name):
     def folder_creater(path):
         try:
@@ -905,161 +775,6 @@ def expration(username, password, tex: tkinter.Text, path, item_ids):
             text_print(tex, e, "red")
     main()
 
-def relative_to_assets(path: str) -> Path:
-    return ASSETS_PATH / path
-
-def silici():
-    items = canvas2.find_all()
-
-    # Her bir öğeyi yok eder (Sadece Canvas üzerindeki şekiller)
-    for item in items:
-        canvas2.delete(item)
-
-    for widget in canvas2.winfo_children():
-        widget.destroy()
-
-    except_list = [canvas, canvas2]
-    for widget in window.winfo_children():
-        if widget not in except_list:
-            widget.destroy()
-
-def width_f(widtha):
-    deneme_label = Label(canvas2, text="0", bg='black', border=0)
-    deneme_label.place(x=50000, y=0)
-    deneme_label.update()
-    a = deneme_label.winfo_width()
-    deneme_label.destroy()
-    widtha = round(widtha / a)
-    return widtha
-
-
-
-
-
-
-
-
-
-
-def settings(isim, settings_var):
-    with open(isim, 'w', encoding='utf-8') as file:
-        file.write(settings_var)
-
-        file.close()
-
-
-def button_hover(event, button):
-    if dictionary[button] == 0 and button != button_5:
-        button.config(background='#3C4043', image=program_icon_hover)
-    elif dictionary[button] == 0 and button == button_5:
-        button.config(background='#3C4043', image=home_icon_hover)
-
-
-def button_leave(event, button):
-    if dictionary[button] == 0 and button != button_5:
-        button.config(background=color, image=program_icon_notselected)
-    elif dictionary[button] == 0 and button == button_5:
-        button.config(background=color, image=home_icon_notselected)
-
-
-def smooth_scroll(delta, canvas, count):
-    """Mouse wheel scroll hareketini smooth hale getirir."""
-    if delta > 0:
-        canvas.yview_scroll(-1, "units")  # Yukarı kaydırma
-    else:
-        canvas.yview_scroll(1, "units")  # Aşağı kaydırma
-    count-=1
-    if count >=0:
-        window.after(10, lambda: smooth_scroll(delta, canvas, count))  # 10 ms sonra tekrar çağır
-def on_mouse_wheel(event):
-    canvas2.yview_scroll(int(-1*(event.delta/120)), "units")
-
-
-def tsv_script(path, output_text):
-    def xlsx_converter():
-        try:
-            os.mkdir(path + '/excel')
-        except:
-            pass
-        text_print(output_text, 'ayarlar çekiliyor...')
-        settings = open('Settings/tsv_settings.txt', 'r')
-        columns = []
-        for line in settings.readlines():
-            line = line.split('=')
-            line = line[1]
-            for i in line.split(','):
-                i = i.replace(' ', '')
-                columns.append(i)
-        text_print(output_text, 'columns= {}'.format(columns))
-
-        dosyalar = dosyalar_dictionary['tsv']
-        if dosyalar == []:
-            text_print(output_text, 'hicbir dosya saglanilmadigi algilanildi lutfen tsv dosyalarinizi belirtilen yere surukleyip birakiniz ardindan yeniden deneyiniz.')
-            sys.exit()
-        for dosya in dosyalar:
-            if dosya.endswith('.tsv'):
-                dosya_name = dosya.split('/')
-                dosya_name = dosya_name[-1]
-                workbook = Workbook('{}/excel/{}'.format(path, dosya_name.replace('.tsv', '') + '.xlsx'))
-                worksheet = workbook.add_worksheet()
-                tsv_reader = csv.reader(open(dosya, 'r'), delimiter='\t')
-                a = 0
-                row1 = 0
-                for row, data in enumerate(tsv_reader):
-                    if a != 1:                         #'Merchant SKU' in data or 'Title' in data or 'ASIN' in data or 'FNSKU' in data:
-                        for col in columns:
-                            if col in data:
-                                a = 1
-                    if a == 1:
-                        worksheet.write_row(row1, 0, data)
-                        row1 += 1
-                workbook.close()
-    def compare_and_write():
-        dosyalar = os.listdir(path + "/excel")
-        new_path = path + '/excel/'
-        dictionary = {}
-        for dosya in dosyalar:
-            if dosya.endswith('.xlsx'):
-                text_print(output_text, dosya)
-                df = pd.read_excel(new_path + dosya)
-                skular= df['Merchant SKU'].tolist()
-                shipped = df['Shipped'].tolist()
-                index = 0
-                a = 0
-                for sku in skular:
-                    try:
-                        a = dictionary[sku]
-                    except:
-                        dictionary[sku] = 0
-                for sku in skular:
-                    dictionary[sku] = dictionary[sku] + shipped[index]
-                    index += 1
-        excel_dictionary = {
-            'Merchant SKU': dictionary.keys(),
-            'Shipped': dictionary.values()
-        }
-        son = pd.DataFrame(excel_dictionary)
-        son.to_excel(path + '/son.xlsx', index=False)
-    def settings():
-        with open('Settings/tsv_settings.txt', 'w', encoding='utf-8') as file:
-            file.write('columns = Merchant SKU, Title, ASIN, FNSKU, external-id, Condition, Shipped')
-            file.close()
-    def main():
-        try:
-            if 'tsv_settings.txt' not in os.listdir('Settings'):
-                settings()
-            xlsx_converter()
-            compare_and_write()
-            text_print(output_text, 'Operasyon başarıyla tamamlandı!')
-            open_folder_in_explorer(path)
-            sys.exit()
-        except Exception as e:
-            text_print(output_text, 'bir hata meydana geldi...')
-            e = traceback.format_exc()
-            text_print(output_text, e, color='red')
-            sys.exit()
-    main()
-
 def future_price_window(future_price_button):
     canvas2.unbind_all("<MouseWheel>")
     def color_change(e,c,t, b):
@@ -1267,17 +982,18 @@ def future_price_window(future_price_button):
     save_name_text.grid(column=0, row=5, sticky='we')
     return_items_res = drag_drop(row1=6, row=7, column=0, dict_name='future_restock',
                                  text='Restock excel dosyasini asagiya surukleyip birakiniz:',
-                                 parent=bottom_frame, padx=0, pady=0, win=f_window)
+                                 parent=bottom_frame, padx=0, pady=0, win=f_window,
+                                 window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     return_items_ftr = drag_drop(row1=8, row=9, column=0, dict_name='future_future',
                                  text='Future Price excel dosyasini asagiya surukleyip birakiniz:',
-                                 parent=bottom_frame, padx=0, pady=0, win=f_window)
+                                 parent=bottom_frame, padx=0, pady=0, win=f_window,
+                                 window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     baslat_button.grid(column=0, row=10, sticky='e', pady=(10,0))
     def on_close():
-        canvas2.bind_all("<MouseWheel>", lambda e: on_mouse_wheel(e))
+        canvas2.bind_all("<MouseWheel>", lambda e: on_mouse_wheel(e, canvas2))
         f_window.destroy()
     f_window.protocol('WM_DELETE_WINDOW', on_close)
     f_window.mainloop()
-
 
 def restock(canvas2):
     scale = 1
@@ -1315,7 +1031,7 @@ def restock(canvas2):
 
     settings_height = 250
     if 'restock_settings.txt' not in os.listdir('Settings'):
-        settings('Settings/restock_settings.txt', settings_var)
+        write_settings('Settings/restock_settings.txt', settings_var)
 
 
     def restock_builder(a,height):
@@ -1394,7 +1110,7 @@ def restock(canvas2):
     restock_main_scrollbar.pack(side= RIGHT, fill=Y)
     canvas2.configure(yscrollcommand=restock_main_scrollbar.set)
 
-    canvas2.bind_all("<MouseWheel>", on_mouse_wheel)
+    canvas2.bind_all("<MouseWheel>", lambda e: on_mouse_wheel(e, canvas2))
     #bg='#ADD8E6'
     alt_canvas = Canvas(
         restock_inner_frame,
@@ -1407,13 +1123,16 @@ def restock(canvas2):
     height = int(150)
 
     width = int(650)
-    ham_liste = ham_drag_drop2(row1=0,row=1,column=0,dict_name='ham_dosyalar_liste',text="Ham dosyalarin excellerini asagiya surukleyip birakiniz:", parent=alt_canvas)
+    ham_liste = ham_drag_drop2(row1=0,row=1,column=0,dict_name='ham_dosyalar_liste',text="Ham dosyalarin excellerini asagiya surukleyip birakiniz:", parent=alt_canvas,
+                               window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     ham_main_canvas= ham_liste[0]
     ham_surukle_text = ham_liste[1]
-    export_liste = drag_drop(row1=2,row=3,column=0,dict_name='export_dosyalar_liste',text="Export dosyalarin excellerini asagiya surukleyip birakiniz:", parent=alt_canvas)
+    export_liste = drag_drop(row1=2,row=3,column=0,dict_name='export_dosyalar_liste',text="Export dosyalarin excellerini asagiya surukleyip birakiniz:", parent=alt_canvas,
+                             window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     export_main_canvas= export_liste[0]
     export_surukle_text = export_liste[1]
-    restock_liste = drag_drop(row1=4,row=5,column=0,dict_name='restock_dosyalar_liste',text="Restock excelini asagiya surukleyip birakiniz:", parent=alt_canvas)
+    restock_liste = drag_drop(row1=4,row=5,column=0,dict_name='restock_dosyalar_liste',text="Restock excelini asagiya surukleyip birakiniz:", parent=alt_canvas, 
+                              window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     restock_main_canvas= restock_liste[0]
     restock_surukle_text = restock_liste[1]
     a = 1
@@ -1422,11 +1141,11 @@ def restock(canvas2):
 
     settings_label = Label(alt_canvas, text='Settings:', font=("JetBrainsMonoRoman Regular", 12), background=color, fg=canvas2_text_color)
     settings_label.grid(column=0, row=9, columnspan=2, sticky = 'w', padx=25, pady=3)
-    restock_settings = Text(alt_canvas,insertbackground='#c0c0c0', border=0, wrap= WORD,width=int(width_f(650)), bg=line_color, fg='#c0c0c0', height = int(settings_height/15),font=("JetBrainsMonoRoman Regular", 10))
+    restock_settings = Text(alt_canvas,insertbackground='#c0c0c0', border=0, wrap= WORD,width=int(width_f(650, canvas2)), bg=line_color, fg='#c0c0c0', height = int(settings_height/15),font=("JetBrainsMonoRoman Regular", 10))
     restock_settings.grid(column=0, row=10, columnspan=2, sticky = 'we', padx=25, pady=5)
     #restock_settings.place(x=25, y=(0+1)*height+25*(0+1))
-    restock_settings.bind('<Enter>',lambda e: on_text_enter(e))
-    restock_settings.bind('<Leave>',lambda e: on_text_leave(e))
+    restock_settings.bind('<Enter>',lambda e: on_text_enter(e, canvas2))
+    restock_settings.bind('<Leave>',lambda e: on_text_leave(e, canvas2))
 
 
 
@@ -1633,8 +1352,8 @@ def restock(canvas2):
         font=("JetBrainsMonoRoman Regular", 13),
         insertbackground='#c0c0c0'
     )
-    restock_output.bind('<Enter>', on_text_enter)
-    restock_output.bind('<Leave>', on_text_leave)
+    restock_output.bind('<Enter>', lambda e: on_text_enter(e, canvas2))
+    restock_output.bind('<Leave>', lambda e: on_text_leave(e, canvas2))
 
     global progress
     progress = ttk.Progressbar(window, orient=HORIZONTAL, mode='determinate')
@@ -1695,7 +1414,7 @@ def restock(canvas2):
         except:pass
         restock_ayarlar = restock_settings.get("1.0", tk.END)
         restock_ayarlar = restock_ayarlar.rstrip("\n")
-        settings('Settings/restock_settings.txt', restock_ayarlar)
+        write_settings('Settings/restock_settings.txt', restock_ayarlar)
         save_name = save_name_text.get(1.0, tk.END).strip('\n')
         save_location_saver('res', save_name_text)
         path = path.replace('\n','')
@@ -1772,7 +1491,6 @@ def restock(canvas2):
     on_resize(1)
     window.bind('<Configure>', lambda e: on_resize(e))
 
-
 def button_expration(canvas2):
     def color_change(e,c,t,b):
         b.config(background=c, text_color=t)
@@ -1790,7 +1508,7 @@ def button_expration(canvas2):
         output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(),0), anchor='w')
         expration_ayarlar = expration_settings_text.get("1.0", tk.END)
         expration_ayarlar = expration_ayarlar.rstrip("\n")
-        settings('Settings/expration_settings.txt', expration_ayarlar)
+        write_settings('Settings/expration_settings.txt', expration_ayarlar)
         item_ids = item_ids_text.get(1.0, tk.END).strip('\n')
         username = expration_username_entry.get().strip('\n')
         password = expration_password_entry.get().strip('\n')
@@ -1828,7 +1546,7 @@ def button_expration(canvas2):
         height=canvas2.winfo_height()
     )
     canvas2.create_window((0, 0), window=block_frame, anchor='nw')
-    canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
+    canvas2.bind_all('<MouseWheel>', lambda e: on_mouse_wheel(e, canvas2))
     expration_scrollbar = MyScrollbar(window, target=canvas2, command=canvas2.yview, thumb_thickness=8, thumb_color='#888888', thickness=18, line_color=line_color)
     canvas2.config(yscrollcommand=expration_scrollbar.set, scrollregion=canvas2.bbox('all'))
     expration_scrollbar.pack(side=RIGHT, fill=Y)
@@ -1982,7 +1700,7 @@ def button_expration(canvas2):
     baslat_button.pack(side=RIGHT, padx=(10,0))
     settings_height=150
     if "expration_settings.txt" not in os.listdir('Settings'):
-        settings("Settings/expration_settings.txt", expration_settings_var)
+        write_settings("Settings/expration_settings.txt", expration_settings_var)
     expration_settings_text = Text(
         expration_bottom_canvas,
         border=0,
@@ -2136,8 +1854,8 @@ def shipmentCreater(canvas2):
         font=("JetBrainsMonoRoman Regular", 13),
         insertbackground='#c0c0c0'
     )
-    shipment_output.bind('<Enter>',lambda e: on_text_enter(e))
-    shipment_output.bind('<Leave>',lambda e: on_text_leave(e))
+    shipment_output.bind('<Enter>',lambda e: on_text_enter(e, canvas2))
+    shipment_output.bind('<Leave>',lambda e: on_text_leave(e, canvas2))
     shipment_output_line = Frame(
         window,
         height=2,
@@ -2221,20 +1939,20 @@ def shipmentCreater(canvas2):
     settings_height = 250
     settings_label = Label(items_canvas, text='Settings:', font=("JetBrainsMonoRoman Regular", 12), background=color, fg=canvas2_text_color)
     if 'shipment_settings.txt' not in os.listdir('Settings'):
-        settings('Settings/shipment_settings.txt', shipment_settings_var)
+        write_settings('Settings/shipment_settings.txt', shipment_settings_var)
     shipment_settings = Text(
         items_canvas,
         border=0,
         wrap= WORD,
-        width=int(width_f(650)),
+        width=int(width_f(650, canvas2)),
         bg=line_color,
         fg='#c0c0c0',
         height = int(settings_height/15),
         font=("JetBrainsMonoRoman Regular", 10),
         insertbackground='#c0c0c0'
     )
-    shipment_settings.bind('<Enter>',lambda e: on_text_enter(e))
-    shipment_settings.bind('<Leave>',lambda e: on_text_leave(e))
+    shipment_settings.bind('<Enter>',lambda e: on_text_enter(e, canvas2))
+    shipment_settings.bind('<Leave>',lambda e: on_text_leave(e, canvas2))
     with open('Settings/shipment_settings.txt', 'r', encoding='utf-8') as file:
         readed = file.read()
         shipment_settings.insert(tk.END, readed)
@@ -2294,7 +2012,7 @@ def shipmentCreater(canvas2):
         shipment_output_line.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(), 0))
         
         shipment_ayarlar = shipment_settings.get("1.0", tk.END).rstrip("\n")
-        settings("Settings/shipment_settings.txt", shipment_ayarlar)
+        write_settings("Settings/shipment_settings.txt", shipment_ayarlar)
         save_name = save_name_text.get("1.0", tk.END).strip('\n')
         save_location_saver('shi', save_name_text)
         dc_name = dc_name_text.get("1.0", tk.END).strip('\n')
@@ -2368,9 +2086,12 @@ def shipmentCreater(canvas2):
     save_name_text.grid(column=0, row=5,pady=(0,20), padx=(25,5), sticky='we')
     dc_name_label.grid(column=0, row=6, pady=(0,0), padx=(25,0), sticky='w')
     dc_name_text.grid(column=0, row=7,pady=(0,20), padx=(25,5), sticky='we')
-    drag_drop(0,1,0,'invoice','Invoice excelini aşağıya sürükleyip bırakın:', items_canvas)
-    drag_drop(2,3,0,'order_form','OrderForm excelini aşağıya sürükleyip bırakın:', items_canvas)
-    drag_drop(4,5,0,'restock','Restock excelini aşağıya sürükleyip bırakın:', items_canvas)
+    drag_drop(0,1,0,'invoice','Invoice excelini aşağıya sürükleyip bırakın:', items_canvas,
+              window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
+    drag_drop(2,3,0,'order_form','OrderForm excelini aşağıya sürükleyip bırakın:', items_canvas,
+              window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
+    drag_drop(4,5,0,'restock','Restock excelini aşağıya sürükleyip bırakın:', items_canvas,
+              window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     settings_label.grid(column=0, row=6, columnspan=2, sticky = 'w', padx=25, pady=3)
     shipment_settings.grid(column=0, row=7, sticky='we', padx=25, pady=4,)
     shipment_submit_button.grid(column=0, row=8, sticky='e', padx=(0,25), pady=(25,0))
@@ -2431,7 +2152,7 @@ def button_invoice(canvas2):
     invoice_main_frame.grid_propagate(False)
     invoice_main_frame.grid_columnconfigure(0, weight=1)
     canvas2.create_window((0,0), window=invoice_main_frame, anchor='nw')
-    canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
+    canvas2.bind_all('<MouseWheel>', lambda e: on_mouse_wheel(e, canvas2))
     invoice_scrollbar = MyScrollbar(window, target=canvas2, command=canvas2.yview, thumb_thickness=8, thumb_color='#888888', thickness=18, line_color=line_color)
     canvas2.config(yscrollcommand=invoice_scrollbar.set, scrollregion=canvas2.bbox('all'))
     invoice_scrollbar.pack(side=RIGHT, fill=Y)
@@ -2581,14 +2302,15 @@ def button_invoice(canvas2):
 
     return_list = drag_drop(0,1,0,'invoice_csv',
               'Aşağıya invoice csv dosyalarını sürükleyip bırakınız:',
-              bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type='.csv')
+              bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type='.csv',
+              window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     drag_frame = return_list[0]
 
     settings_label = Label(bottom_canvas, text='Settings:', font=("JetBrainsMonoRoman Regular", 12), background=color, fg=canvas2_text_color)
 
     settings_height=150
     if 'invoice_settings.txt' not in os.listdir('Settings'):
-        settings('Settings/invoice_settings.txt', invoice_settings_var)
+        write_settings('Settings/invoice_settings.txt', invoice_settings_var)
     settings_text = Text(
         bottom_canvas,
         border=0,
@@ -2599,8 +2321,8 @@ def button_invoice(canvas2):
         font=("JetBrainsMonoRoman Regular", 10),
         insertbackground='#c0c0c0'
     )
-    settings_text.bind('<Enter>',lambda e: on_text_enter(e))
-    settings_text.bind('<Leave>',lambda e: on_text_leave(e))
+    settings_text.bind('<Enter>',lambda e: on_text_enter(e, canvas2))
+    settings_text.bind('<Leave>',lambda e: on_text_leave(e, canvas2))
     with open('Settings/invoice_settings.txt', 'r', encoding='utf-8') as file:
         readed = file.read()
         settings_text.insert(tk.END, readed)
@@ -2639,8 +2361,8 @@ def button_invoice(canvas2):
         font=("JetBrainsMonoRoman Regular", 13),
         insertbackground='#c0c0c0'
     )
-    output_text.bind("<Enter>", on_text_enter)
-    output_text.bind("<Leave>", on_text_leave)
+    output_text.bind("<Enter>", lambda e: on_text_enter(e, canvas2))
+    output_text.bind("<Leave>", lambda e: on_text_leave(e, canvas2))
 
 
     top_canvas.grid(column=0, row=0, sticky='we', padx=(25,0), pady=(25,0))
@@ -2660,7 +2382,7 @@ def button_invoice(canvas2):
         window.bind("<Configure>", lambda e: resize(e, True))
         
         invoice_ayarlar = settings_text.get("1.0", tk.END).rstrip("\n")
-        settings('Settings/invoice_settings.txt', invoice_ayarlar)
+        write_settings('Settings/invoice_settings.txt', invoice_ayarlar)
         delzero = invoice_active_dictionary["0"]
         
         if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
@@ -2693,7 +2415,6 @@ def button_invoice(canvas2):
         conversion_thread.start()
     window.bind("<Configure>", lambda e: resize(e, False))
 
-
 def button_converter(canvas2):
     def resize_converter(e, a):
         scale = main_frame_resize()
@@ -2720,7 +2441,7 @@ def button_converter(canvas2):
         height=canvas2.winfo_height()
     )
     canvas2.create_window((0,0), window=converter_main_frame, anchor='nw')
-    canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
+    canvas2.bind_all('<MouseWheel>', lambda e: on_mouse_wheel(e, canvas2))
     converter_scrollbar = MyScrollbar(window, target=canvas2, command=canvas2.yview, thumb_thickness=8, thumb_color='#888888', thickness=18, line_color=line_color)
     canvas2.config(yscrollcommand=converter_scrollbar.set, scrollregion=canvas2.bbox('all'))
     converter_scrollbar.pack(side=RIGHT, fill=Y)
@@ -2793,15 +2514,18 @@ def button_converter(canvas2):
         file_image = file_type_dictionary[file_type]['file_image']
         drag_drop(0,1,0,'convert',
                   'Aşağıya dönüştürmek istediğiniz dosyaları sürükleyip bırakınız:',
-                  bottom_canvas, padx=0, bg_image=bg_image, file_image=file_image, file_type=file_type)
+                  bottom_canvas, padx=0, bg_image=bg_image, file_image=file_image, file_type=file_type,
+                  window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
         '''if var1.get() == 'csv':
             drag_drop(0,1,0,'convert',
                       'Aşağıya dönüştürmek istediğiniz dosyaları sürükleyip bırakınız:',
-                      bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type=".csv")
+                      bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type=".csv",
+                      window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
         elif var1.get() == 'xlsx':
             drag_drop(0,1,0,'convert',
                       'Aşağıya dönüştürmek istediğiniz dosyaları sürükleyip bırakınız:',
-                      bottom_canvas, padx=0, file_type=".xlsx")'''
+                      bottom_canvas, padx=0, file_type=".xlsx",
+                      window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)'''
     var1.trace_add('write', var1_changed)
 
     save_path_label = Label(
@@ -2868,7 +2592,8 @@ def button_converter(canvas2):
 
     converter_return = drag_drop(0,1,0,'convert',
                                  'Aşağıya dönüştürmek istediğiniz dosyaları sürükleyip bırakınız:',
-                                 bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type=".csv")
+                                 bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type=".csv",
+                                 window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     converter_dd_text = converter_return[0]
     converter_dd_frame = converter_return[1]
     convert_button = MyButton(
@@ -2959,572 +2684,6 @@ def button_converter(canvas2):
         conversion_thread.start()
 
     window.bind("<Configure>", lambda e: resize_converter(e, False))
-
-
-def button_tsv(canvas2):
-    def tsv_resize(e, a):
-        scale = main_frame_resize()
-        tvs_drop_frame.config(height=175*scale)
-        height = alt_canvas.winfo_y()+alt_canvas.winfo_height()+20
-        if a:
-            tsv_output.pack_configure(padx=(canvas.winfo_width(), 0))
-            if height < canvas2.winfo_height()-200:
-                tvs_main_frame.config(width=750*scale, height=canvas2.winfo_height())
-            else:
-                tvs_main_frame.config(width=750*scale, height=height+200)
-        else:
-            if height < canvas2.winfo_height():
-                tvs_main_frame.config(width=750*scale, height=canvas2.winfo_height())
-            else:
-                tvs_main_frame.config(width=750*scale, height=height)
-        canvas2.config(scrollregion=canvas2.bbox('all'))
-    tvs_main_frame = Frame(
-        canvas2,
-        bg=color,
-        height=canvas2.winfo_height(),
-        width=750
-    )
-    canvas2.create_window((0,0), anchor='nw', window=tvs_main_frame)
-    canvas2.config(scrollregion=canvas2.bbox("all"))
-    #tvs_main_frame.pack(side=LEFT,fill=BOTH, expand=True)
-    canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
-    tsv_scrollbar = MyScrollbar(window, target=canvas2, command=canvas2.yview, thumb_thickness=8, thumb_color='#888888', thickness=18, line_color=line_color)
-    canvas2.config(yscrollcommand=tsv_scrollbar.set, scrollregion=canvas2.bbox('all'))
-    tsv_scrollbar.pack(side=RIGHT, fill=Y)
-    tvs_main_frame.grid_columnconfigure(0, weight=1)
-    tvs_main_frame.grid_propagate(False)
-    ust_canvas = Canvas(
-        tvs_main_frame,
-        border=0,
-        highlightthickness=0,
-        bg=color
-    )
-    ust_canvas.grid(column=0, row=0, sticky='we', padx=(25,0), pady=(25,0))
-    ust_canvas.grid_columnconfigure(0, weight=1)
-    alt_canvas = Canvas(
-        tvs_main_frame,
-        border=0,
-        highlightthickness=0,
-        bg=color,
-    )
-    alt_canvas.grid(column=0, row=1, sticky='we', padx=(0,0))
-    alt_canvas.grid_columnconfigure(0, weight=1)
-    title = Label(
-        ust_canvas,
-        text="TSV PROGRAMI",
-        bg=color,
-        fg=canvas2_text_color,
-        font=("JetBrainsMonoRoman Regular", 24 * -1)
-    )
-    title.grid(column=0, row=0, sticky="w")
-    tsv_title_line = Frame(
-        ust_canvas,
-        height=2,
-        bg=line_color,
-        border=0,
-        highlightthickness=0
-    )
-    tsv_title_line.grid(column=0, row=1, sticky="we")
-    tsv_path_label = Label(
-        ust_canvas,
-        text="Aşağıya sonuçların kaydedilmesini istediğiniz dosya yolunu giriniz:",
-        background=color,
-        fg=canvas2_text_color,
-        font=("JetBrainsMonoRoman Regular", 12)
-    )
-    tsv_path_label.grid(column=0, row=2, sticky="w", pady=(25,0))
-
-    tsv_path_frame = Frame(ust_canvas, bg=color, height=30)
-    tsv_path_frame.grid(column=0, row=3, sticky="we", pady=(0,25))
-    tsv_path_text = Text(
-        tsv_path_frame,
-        height=1,
-        font=("JetBrainsMonoRoman Regular", 12),
-        fg='#747474',
-        bg=line_color,
-        border=0,
-        pady=4,
-        insertbackground='#c0c0c0'
-    )
-    tsv_browse_button = MyButton(
-        tsv_path_frame,
-        text='Browse',
-        background=line_color,
-        text_color='white',
-        width=100,
-        height=25,
-        round=0,
-        align_text="center",
-        font=("Helvatica", 9)
-    )
-    save_button = MyButton(
-        tsv_path_frame,
-        text='Kaydet',
-        background=line_color,
-        text_color='white',
-        width=100,
-        height=25,
-        round=0,
-        align_text="center",
-        font=("Helvatica", 9)
-    )
-    def browse_click(event, c, t, text_item, b):
-        browse_color_change(event,c,t,b)
-        browse_directory(text_item , w=window)
-    def browse_color_change(e,c,t,b):
-        b.config(background=c, text_color=t)
-    def save_click(event, c, t, b):
-        browse_color_change(event,c,t,b)
-        placeholder_saver('tsv', tsv_path_text)
-    tsv_browse_button.bind("<Button-1>", lambda e: browse_click(e,'#8AB4F8','black', tsv_path_text, tsv_browse_button))
-    tsv_browse_button.bind("<ButtonRelease-1>", lambda e: browse_color_change(e,'#727478','white', tsv_browse_button))
-    tsv_browse_button.bind("<Enter>", lambda e: browse_color_change(e,'#727478',canvas2_text_color, tsv_browse_button))
-    tsv_browse_button.bind("<Leave>", lambda e: browse_color_change(e,line_color,'white', tsv_browse_button))
-    save_button.bind("<Button-1>", lambda e: save_click(e,'#8AB4F8','black', save_button))
-    save_button.bind("<ButtonRelease-1>", lambda e: browse_color_change(e,'#727478','white', save_button))
-    save_button.bind("<Enter>", lambda e: browse_color_change(e,'#727478',canvas2_text_color, save_button))
-    save_button.bind("<Leave>", lambda e: browse_color_change(e,line_color,'white', save_button))
-    tsv_browse_button.pack(side=RIGHT, padx=(8,0))
-    save_button.pack(side=RIGHT, padx=(8,0))
-    placeholder = "Example: C:/Users/Username/Desktop/sonuc"
-    path_text_function('tsv', tsv_path_text, placeholder)
-    window.unbind("<Button-1>")
-    tsv_path_text.pack(side=LEFT, fill=X, expand=True)
-    tsv_path_text.bind("<Button-1>", lambda e: on_focus_in(e, tsv_path_text, placeholder, canvas2_text_color))
-    tsv_path_text.bind("<FocusOut>", lambda e: on_focus_out(e, tsv_path_text, placeholder, canvas2_text_color))
-    window.bind("<Button-1>", lambda e: on_click_outside(e, tsv_path_text, placeholder, canvas2_text_color))
-
-
-
-
-    tvs_bg_image = PhotoImage(
-        file=relative_to_assets('tvs_bg_rs.png')
-    )
-    tvs_file_image = PhotoImage(
-        file=relative_to_assets('TVS_file.png')
-    )
-
-    tvs_drop_return = drag_drop(row1=0,row=1,column=0,dict_name="tsv",
-                                text=".tsv uzantili dosyalarinizi asagiya surukleyip birakiniz...", parent=alt_canvas,
-                                file_image=tvs_file_image, bg_image=tvs_bg_image, file_type=".tsv", padx=(25,0))
-    tvs_drop_frame = tvs_drop_return[0]
-    tvs_surukle_text = tvs_drop_return[1]
-    baslat_button = MyButton(
-        alt_canvas,
-        round=15,
-        width=100,
-        height=50,
-        text='Başlat',
-        background=line_color,
-        text_color='white',
-        align_text='center'
-    )
-
-    settings_height=100
-    tsv_settings_label = Label(alt_canvas, text='Settings:', font=("JetBrainsMonoRoman Regular", 12), background=color, fg=canvas2_text_color)
-    if 'tsv_settings.txt' not in os.listdir('Settings'):
-        settings('Settings/tsv_settings.txt', tsv_settings_var)
-    tsv_settings_text = Text(
-        alt_canvas,
-        border=0,
-        wrap= WORD,
-        bg=line_color,
-        fg='#c0c0c0',
-        height = int(settings_height/15),
-        font=("JetBrainsMonoRoman Regular", 10),
-        insertbackground='#c0c0c0'
-    )
-    tsv_settings_text.bind('<Enter>',lambda e: on_text_enter(e))
-    tsv_settings_text.bind('<Leave>',lambda e: on_text_leave(e))
-    with open('Settings/tsv_settings.txt', 'r', encoding='utf-8') as file:
-        readed = file.read()
-        tsv_settings_text.insert(tk.END, readed)
-        tsv_settings_text.see(tk.END)
-    tsv_settings_label.grid(column=0, row=2, columnspan=2, sticky = 'w', padx=25, pady=3)
-    tsv_settings_text.grid(column=0, row=3, columnspan=2, sticky = 'we', padx=(25,0), pady=5)
-
-
-    baslat_button.grid(column=0, row=4, sticky='e', padx=(0,0), pady=(15,0))
-    def color_change(e,c,t):
-        baslat_button.config(background=c, text_color=t)
-    def baslat_click(e,c,t):
-        color_change(e,c,t)
-        path = tsv_path_text.get(1.0, END)
-        path = path.rstrip("\n")
-        output(path)
-    baslat_button.bind("<Button-1>", lambda e: baslat_click(e,'#8AB4F8','black'))
-    baslat_button.bind("<ButtonRelease-1>", lambda e: color_change(e,'#727478','white'))
-    baslat_button.bind("<Enter>", lambda e: color_change(e,'#727478',canvas2_text_color))
-    baslat_button.bind("<Leave>", lambda e: color_change(e,line_color,'white'))
-    tsv_liste = [canvas, canvas2, button_1, button_2, button_3, button_4, button_5, tvs_main_frame]
-    tsv_output = Text(
-        window,
-        border=0,
-        wrap= WORD,
-        bg=line_color,
-        fg='#c0c0c0',
-        height = 10,
-        font=("JetBrainsMonoRoman Regular", 13),
-        insertbackground='#c0c0c0'
-    )
-
-    def tsv_script_starter(path, output_text):
-        t = Thread(target=tsv_script, args=(path, output_text,), daemon=True)
-        t.start()
-    def output(path):
-        tsv_output.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(),0))
-        window.unbind("<Configure>")
-        window.bind("<Configure>", lambda e: tsv_resize(e, True))
-        tsv_ayarlar = tsv_settings_text.get("1.0", tk.END)
-        tsv_ayarlar = tsv_ayarlar.rstrip("\n")
-        settings('Settings/tsv_settings.txt', tsv_ayarlar)
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            tsv_output.insert(END, "path degeri algilanamadi, lutfen dogru bir deger girdiginizden emin olup tekrar deneyiniz.\n")
-            tsv_output.see(END)
-        else:
-            tsv_output.insert(END, str(dosyalar_dictionary["tsv"])+"\n")
-            tsv_output.insert(END, path+"\n")
-            tsv_output.see(END)
-            tsv_script_starter(path, tsv_output)
-
-
-    canvas2.config(scrollregion=canvas2.bbox('all'))
-    window.bind("<Configure>", lambda e: tsv_resize(e, False))
-
-def button_costupdater(canvas2):
-    def resize(e, a):
-        scale = main_frame_resize()
-        height = bottom_canvas.winfo_y()+bottom_canvas.winfo_height()+20
-        drag_frame.config(height=175*scale)
-        if a:
-            output_text.pack_configure(padx=(canvas.winfo_width(), 0))
-            if height < canvas2.winfo_height()-200:
-                cost_main_frame.config(width=750*scale, height=canvas2.winfo_height())
-            else:
-                cost_main_frame.config(width=750*scale, height=height+200)
-        else:
-            if height < canvas2.winfo_height():
-                cost_main_frame.config(width=750*scale, height=canvas2.winfo_height())
-            else:
-                cost_main_frame.config(width=750*scale, height=height)
-        canvas2.config(scrollregion=canvas2.bbox('all'))
-    def new_active():
-        if 'costupdater2_settings.txt' not in os.listdir('Settings'):
-            settings('Settings/costupdater2_settings.txt', costupdater2_settings_var)
-        with open('Settings/costupdater2_settings.txt', 'r', encoding='utf-8') as file:
-            readed = file.read()
-            settings_text.delete(1.0, tk.END)
-            settings_text.insert(tk.END, readed)
-            settings_text.see(tk.END)
-        baslat_button.bind("<Button-1>", lambda e: baslat2_click(e,'#8AB4F8','black'))
-    def new_deactive():
-        if 'costupdater_settings.txt' not in os.listdir('Settings'):
-            settings('Settings/costupdater_settings.txt', costupdater_settings_var)
-        with open('Settings/costupdater_settings.txt', 'r', encoding='utf-8') as file:
-            readed = file.read()
-            settings_text.delete(1.0, tk.END)
-            settings_text.insert(tk.END, readed)
-            settings_text.see(tk.END)
-        baslat_button.bind("<Button-1>", lambda e: baslat_click(e, '#8AB4F8', 'black'))
-    cost_main_frame = Frame(
-        canvas2,
-        bg=color,
-        height=canvas2.winfo_height(),
-        width=750
-    )
-    canvas2.create_window((0,0), window=cost_main_frame, anchor='nw')
-
-    canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
-    costupdater_scrollbar = MyScrollbar(window, target=canvas2, command=canvas2.yview, thumb_thickness=8, thumb_color='#888888', thickness=18, line_color=line_color)
-    canvas2.config(yscrollcommand=costupdater_scrollbar.set, scrollregion=canvas2.bbox('all'))
-    costupdater_scrollbar.pack(side=RIGHT, fill=Y)
-
-    cost_main_frame.grid_columnconfigure(0, weight=1)
-    cost_main_frame.grid_propagate(False)
-
-
-    #creating the top and bottom canvas:
-
-    top_canvas = Canvas(
-        cost_main_frame,
-        background=color,
-        highlightthickness=0,
-        border=0
-    )
-    bottom_canvas = Canvas(
-        cost_main_frame,
-        background=color,
-        highlightthickness=0,
-        border=0
-    )
-
-    #top and bottom canvaslarin yerlesimi:
-
-    top_canvas.grid(column=0, row=0, sticky='ew', padx=(25,0), pady=(20,0))
-    top_canvas.grid_columnconfigure(0, weight=1)
-    bottom_canvas.grid(column=0, row=1, sticky='ew', padx=(25,0), pady=0)
-    bottom_canvas.grid_columnconfigure(0, weight=1)
-
-    #widgets:
-    title_frame = Frame(
-        top_canvas,
-        background=color
-    )
-    title = Label(
-        title_frame,
-        background=color,
-        fg=canvas2_text_color,
-        text="Cost Updater",
-        font=(("JetBrainsMonoRoman Regular", 24 * -1))
-    )
-    new_switch = SwitchButton(
-        parent=title_frame,
-        border=0,
-        highlightthickness=0,
-        active_function=lambda: new_active(),
-        pasif_function=lambda: new_deactive(),
-        f='red',
-        s='green',
-        status=True
-    )
-    title_line = Frame(
-        top_canvas,
-        height = 2,
-        background=line_color,
-    )
-
-    save_path_label = Label(
-        top_canvas,
-        background=color,
-        fg=canvas2_text_color,
-        text="Sonuçların kaydedilmesini istediğiniz klasörün yolunu giriniz:",
-        font=("JetBrainsMonoRoman Regular", 12),
-    )
-    path_frame = Frame(
-        top_canvas,
-        background=color,
-        height=30
-    )
-    save_path = Text(
-        path_frame,
-        height=1,
-        font=("JetBrainsMonoRoman Regular", 12),
-        fg='#747474',
-        background=line_color,
-        border=0,
-        pady=4,
-        insertbackground='#c0c0c0'
-    )
-    browse_button = MyButton(
-        path_frame,
-        text='Browse',
-        background=line_color,
-        text_color='white',
-        width=100,
-        height=25,
-        round=0,
-        align_text="center",
-        font=("Helvatica", 9)
-    )
-    save_button = MyButton(
-        path_frame,
-        text='Kaydet',
-        background=line_color,
-        text_color='white',
-        width=100,
-        height=25,
-        round=0,
-        align_text="center",
-        font=("Helvatica", 9)
-    )
-    def browse_click(event, c, t, text_item, b):
-        browse_color_change(event,c,t,b)
-        browse_directory(text_item, w=window)
-    def browse_color_change(e,c,t,b):
-        b.config(background=c, text_color=t)
-    def save_click(event, c, t, b):
-        browse_color_change(event,c,t,b)
-        placeholder_saver('cos', save_path)
-    browse_button.bind("<Button-1>", lambda e: browse_click(e,'#8AB4F8','black', save_path, browse_button))
-    browse_button.bind("<ButtonRelease-1>", lambda e: browse_color_change(e,'#727478','white', browse_button))
-    browse_button.bind("<Enter>", lambda e: browse_color_change(e,'#727478',canvas2_text_color, browse_button))
-    browse_button.bind("<Leave>", lambda e: browse_color_change(e,line_color,'white', browse_button))
-    save_button.bind("<Button-1>", lambda e: save_click(e,'#8AB4F8','black', save_button))
-    save_button.bind("<ButtonRelease-1>", lambda e: browse_color_change(e,'#727478','white', save_button))
-    save_button.bind("<Enter>", lambda e: browse_color_change(e,'#727478',canvas2_text_color, save_button))
-    save_button.bind("<Leave>", lambda e: browse_color_change(e,line_color,'white', save_button))
-
-    placeholder = "Example: C:/Users/Username/Desktop/sonuc"
-    path_text_function('cos', save_path, placeholder)
-    window.unbind("<Button-1>")
-    save_path.bind("<Button-1>", lambda e: on_focus_in(e, save_path, placeholder, canvas2_text_color))
-    save_path.bind("<FocusOut>", lambda e: on_focus_out(e, save_path, placeholder, canvas2_text_color))
-    window.bind("<Button-1>", lambda e: on_click_outside(e, save_path, placeholder, canvas2_text_color))
-
-    browse_button.pack(side=RIGHT, padx=(8,0))
-    save_button.pack(side=RIGHT, padx=(8,0))
-    save_path.pack(side=LEFT, fill=X, expand=True)
-
-    return_list = drag_drop(0,1,0,'costupdater',
-                            'Aşağıya ilgili csv dosyasini surukleyip birakiniz:',
-                            bottom_canvas, padx=0, bg_image=csv_drag_drop_image, file_image=csv_icon_image, file_type='.csv')
-    drag_frame = return_list[0]
-
-    settings_label = Label(bottom_canvas, text='Settings:', font=("JetBrainsMonoRoman Regular", 12), background=color, fg=canvas2_text_color)
-
-    settings_height=225
-    if 'costupdater2_settings.txt' not in os.listdir('Settings'):
-        settings('Settings/costupdater2_settings.txt', costupdater2_settings_var)
-    settings_text = Text(
-        bottom_canvas,
-        border=0,
-        wrap= WORD,
-        bg=line_color,
-        fg='#c0c0c0',
-        height = int(settings_height/15),
-        font=("JetBrainsMonoRoman Regular", 10),
-        insertbackground='#c0c0c0'
-    )
-    settings_text.bind('<Enter>',lambda e: on_text_enter(e))
-    settings_text.bind('<Leave>',lambda e: on_text_leave(e))
-    with open('Settings/costupdater2_settings.txt', 'r', encoding='utf-8') as file:
-        readed = file.read()
-        settings_text.insert(tk.END, readed)
-        settings_text.see(tk.END)
-
-
-    baslat_button = MyButton(
-        bottom_canvas,
-        round=15,
-        width=100,
-        height=50,
-        text='Başlat',
-        background=line_color,
-        text_color='white',
-        align_text='center'
-    )
-    def color_change(e,c,t):
-        baslat_button.config(background=c, text_color=t)
-    def baslat2_click(e,c,t):
-        color_change(e,c,t)
-        path = save_path.get(1.0, END)
-        path = path.rstrip("\n")
-        print("baslat2 calisti")
-        output2(path)
-    def baslat_click(e,c,t):
-        color_change(e,c,t)
-        path = save_path.get(1.0, END)
-        path = path.rstrip("\n")
-        print("baslat calisti")
-        output(path)
-    baslat_button.bind("<Button-1>", lambda e: baslat2_click(e,'#8AB4F8','black'))
-    baslat_button.bind("<ButtonRelease-1>", lambda e: color_change(e,'#727478','white'))
-    baslat_button.bind("<Enter>", lambda e: color_change(e,'#727478',canvas2_text_color))
-    baslat_button.bind("<Leave>", lambda e: color_change(e,line_color,'white'))
-
-    output_text = Text(
-        window,
-        border=0,
-        wrap= WORD,
-        bg=line_color,
-        fg='#c0c0c0',
-        height = 10,
-        font=("JetBrainsMonoRoman Regular", 13),
-        insertbackground='#c0c0c0'
-    )
-    output_text.bind("<Enter>", on_text_enter)
-    output_text.bind("<Leave>", on_text_leave)
-
-    title.pack(side='left')
-    new_switch.pack(side='right')
-    title_frame.grid(column=0, row=0, sticky='ew')
-    title_line.grid(column=0, row=1, sticky='ew')
-
-    top_canvas.grid(column=0, row=0, sticky='we', padx=(25,0), pady=(25,0))
-    bottom_canvas.grid(column=0, row=1, sticky='we', padx=(25,0), pady=(25,0))
-    save_path_label.grid(column=0, row=2, sticky='w', pady=(25,0))
-    path_frame.grid(column=0, row=3, sticky='we')
-    settings_label.grid(column=0, row=2, sticky='w', pady=4)
-    settings_text.grid(column=0, row=3, sticky='we')
-    baslat_button.grid(column=0, row=4, sticky='e', pady=(20,0))
-    def output2(path):
-        output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
-        window.unbind("<Configure>")
-        window.bind("<Configure>", lambda e: resize(e, True))
-        
-        costupdater_ayarlar = settings_text.get("1.0", tk.END).rstrip("\n")
-        settings('Settings/costupdater2_settings.txt', costupdater_ayarlar)
-        
-        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
-            text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
-            return
-            
-        csv_files = dosyalar_dictionary.get('costupdater', [])
-        if not csv_files:
-            text_print(output_text, "Hata: İşlenecek CSV dosyası sürüklemediniz.", color="red")
-            return
-            
-        input_file = csv_files[0]
-        
-        def update_progress(msg: str):
-            output_text.after(0, lambda: text_print(output_text, msg))
-
-        def run_in_thread():
-            try:
-                result = process_costupdater2(
-                    input_file, 
-                    path, 
-                    costupdater_ayarlar, 
-                    progress_callback=update_progress
-                )
-                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
-                output_text.after(0, lambda: open_folder_in_explorer(path))
-            except Exception as e:
-                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
-
-        conversion_thread = Thread(target=run_in_thread, daemon=True)
-        conversion_thread.start()
-
-    def output(path):
-        output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
-        window.unbind("<Configure>")
-        window.bind("<Configure>", lambda e: resize(e, True))
-        
-        costupdater_ayarlar = settings_text.get("1.0", tk.END).rstrip("\n")
-        settings('Settings/costupdater_settings.txt', costupdater_ayarlar)
-        
-        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
-            text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
-            return
-            
-        csv_files = dosyalar_dictionary.get('costupdater', [])
-        if not csv_files:
-            text_print(output_text, "Hata: İşlenecek CSV dosyası sürüklemediniz.", color="red")
-            return
-            
-        input_file = csv_files[0]
-        
-        def update_progress(msg: str):
-            output_text.after(0, lambda: text_print(output_text, msg))
-
-        def run_in_thread():
-            try:
-                result = process_costupdater(
-                    input_file, 
-                    path, 
-                    costupdater_ayarlar, 
-                    progress_callback=update_progress
-                )
-                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
-                output_text.after(0, lambda: open_folder_in_explorer(path))
-            except Exception as e:
-                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
-
-        conversion_thread = Thread(target=run_in_thread, daemon=True)
-        conversion_thread.start()
-
-    window.bind("<Configure>", lambda e: resize(e, False))
-
 
 def button_updater(canvas2):
     checkforupdates_label = Label(
@@ -4054,7 +3213,8 @@ def button_invoicefinder(canvas2):
     allinvoices_path_frame.grid(column=0, row=7, sticky='we')
     invoice_date_label.grid(column=0, row=8, sticky='w', pady=(20, 0))
     invoice_date_text.grid(column=0, row=9, sticky='we')
-    return_list = drag_drop(row1=0, row=1, column=0, dict_name='invoice_finder', text='Aşağıya siteden aldığınız verileri içeren excel dosyasını sürükleyip bırakınız:', parent=bottom_frame, padx=0)
+    return_list = drag_drop(row1=0, row=1, column=0, dict_name='invoice_finder', text='Aşağıya siteden aldığınız verileri içeren excel dosyasını sürükleyip bırakınız:', parent=bottom_frame, padx=0,
+                            window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
     invoice_finder_drop_frame = return_list[0]
     invoice_finder_surukle_text = return_list[1]
     buttons_frame.grid(column=0, row=2, sticky='e', pady=(20,0))
@@ -4122,7 +3282,7 @@ def button_invoicefinder(canvas2):
         window.unbind("<Configure>")
         window.bind('<Configure>', lambda e: invoicefinder_resize(e, 1))
     window.bind('<Configure>', lambda e: invoicefinder_resize(e, 0))
-    canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
+    canvas2.bind_all('<MouseWheel>', lambda e: on_mouse_wheel(e, canvas2))
 
 def button_order_create(canvas2):
 
@@ -4193,8 +3353,8 @@ def button_order_create(canvas2):
         font=("JetBrainsMonoRoman Regular", 13),
         insertbackground='#c0c0c0'
     )
-    shipment_output.bind('<Enter>',lambda e: on_text_enter(e))
-    shipment_output.bind('<Leave>',lambda e: on_text_leave(e))
+    shipment_output.bind('<Enter>',lambda e: on_text_enter(e, canvas2))
+    shipment_output.bind('<Leave>',lambda e: on_text_leave(e, canvas2))
     shipment_output_line = Frame(
         window,
         height=2,
@@ -4245,8 +3405,10 @@ def button_order_create(canvas2):
     )
 
 
-    restock_return = drag_drop(0, 1, 0, 'order_create_restock', 'RESTOCK excel dosyasini asagiya surukleyip birakiniz.', items_canvas,)
-    orderform_return = drag_drop(2, 3, 0, 'order_create_orderform', 'ORDER FORM excel dosyasini asagiya surukleyip birakiniz.', items_canvas,)
+    restock_return = drag_drop(0, 1, 0, 'order_create_restock', 'RESTOCK excel dosyasini asagiya surukleyip birakiniz.', items_canvas,
+                               window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
+    orderform_return = drag_drop(2, 3, 0, 'order_create_orderform', 'ORDER FORM excel dosyasini asagiya surukleyip birakiniz.', items_canvas,
+                                 window=window, canvas2=canvas2, color=color, text_color=canvas2_text_color, dosyalar_dictionary=dosyalar_dictionary)
 
     restock_dragframe = restock_return[0]
     orderform_dragframe = orderform_return[0]
@@ -4289,20 +3451,20 @@ def button_order_create(canvas2):
     settings_height = 250
     settings_label = Label(items_canvas, text='Settings:', font=("JetBrainsMonoRoman Regular", 12), background=color, fg=canvas2_text_color)
     if 'ordercreate_settings.txt' not in os.listdir('Settings'):
-        settings('Settings/ordercreate_settings.txt', ordercreate_settings_var)
+        write_settings('Settings/ordercreate_settings.txt', ordercreate_settings_var)
     order_create_settings = Text(
         items_canvas,
         border=0,
         wrap= WORD,
-        width=int(width_f(650)),
+        width=int(width_f(650, canvas2)),
         bg=line_color,
         fg='#c0c0c0',
         height = int(settings_height/15),
         font=("JetBrainsMonoRoman Regular", 10),
         insertbackground='#c0c0c0'
     )
-    order_create_settings.bind('<Enter>', lambda e: on_text_enter(e))
-    order_create_settings.bind('<Leave>', lambda e: on_text_leave(e))
+    order_create_settings.bind('<Enter>', lambda e: on_text_enter(e, canvas2))
+    order_create_settings.bind('<Leave>', lambda e: on_text_leave(e, canvas2))
     with open('Settings/ordercreate_settings.txt', 'r', encoding='utf-8') as file:
         readed = file.read()
         order_create_settings.insert(tk.END, readed)
@@ -4380,7 +3542,7 @@ def button_order_create(canvas2):
         window.bind("<Configure>", lambda e: resize(e, True))
         
         ordercreate_ayarlar = order_create_settings.get("1.0", tk.END).rstrip("\n")
-        settings("Settings/ordercreate_settings.txt", ordercreate_ayarlar)
+        write_settings("Settings/ordercreate_settings.txt", ordercreate_ayarlar)
         
         if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
             text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
@@ -4418,14 +3580,11 @@ def button_order_create(canvas2):
     canvas2.bind_all("<MouseWheel>", on_mouse_wheel)
     window.bind("<Configure>", lambda e: resize(e, False))
 
-
-
-
 def button(canvas2, button):
     canvas2.delete("all")
     canvas2.unbind_all("<MouseWheel>")
     window.unbind('<Configure>')
-    silici()
+    silici(canvas, canvas2, window)
     scrollbar = Scrollbar()
     canvas2.config(scrollregion=canvas2.bbox("all"))  # Canvas'ın scroll bölgesini güncelle
     scrollbar.config(command=canvas2.yview)
@@ -4481,7 +3640,7 @@ def button(canvas2, button):
     if button == button_3:
         dictionary_update(button_3)
         canvas2.unbind_all('<MouseWheel>')
-        button_tsv(canvas2)
+        render_tsv_view(canvas, canvas2, window, color, line_color, canvas2_text_color, dosyalar_dictionary, main_frame_resize)
     if button == button_4:
         dictionary_update(button_4)
         canvas2.config(height=window.winfo_height())
@@ -4535,7 +3694,7 @@ def button(canvas2, button):
         button_converter(canvas2)
     if button == button_8:
         dictionary_update(button_8)
-        button_costupdater(canvas2)
+        render_costupdater_view(canvas, canvas2, window, color, line_color, canvas2_text_color, dosyalar_dictionary, main_frame_resize)
     if button == button_9:
         dictionary_update(button_9)
         button_updater(canvas2)
@@ -4545,513 +3704,6 @@ def button(canvas2, button):
     if button == button_11:
         dictionary_update(button_11)
         button_order_create(canvas2)
-
-
-def drag_drop(row1,row,column,dict_name,text,parent,win=0, bg_image=0, file_image=0, file_type=".xlsx", padx=25, pady=25, ):
-    if win == 0:
-        win = window
-    dosyalar_dictionary[dict_name] = []
-    button_list = []
-    image_dictionary = {
-        'sil_button_image': PhotoImage(file=relative_to_assets("image_3.png"), width=35, height=25),
-        'excel_dosya_image': PhotoImage(file=relative_to_assets("image_5.png")),
-        'drag_drop_image': ''
-    }
-    if file_image == 0:
-        file_image = image_dictionary['excel_dosya_image']
-    surukle_text = Label(parent, text=text, background=color, fg=canvas2_text_color, font=("JetBrainsMonoRoman Regular", 12))
-    surukle_text.grid(column=column, row=row1, columnspan=2, padx=padx, pady=10, sticky='w')
-    def on_frame_enter(event):
-        canvas2.unbind_all("<MouseWheel>")
-        drop_canvas.bind_all("<MouseWheel>", on_mouse_wheel_frame)
-
-    def on_frame_leave(event):
-        canvas2.bind_all("<MouseWheel>", on_mouse_wheel)
-    def drag():
-        main_canvas.yview_scroll(10, "units")
-    def on_mouse_wheel_frame(event):
-        drop_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-
-
-
-    def drop(event):
-        main_frame.bind("<Enter>", on_frame_enter)
-        main_frame.bind("<Leave>", on_frame_leave)
-        drop_canvas.bind_all("<MouseWheel>", on_mouse_wheel_frame)
-        drop_canvas.config(scrollregion=drop_canvas.bbox('all'))
-        k = 1
-        if type(event) == tuple or event == '':
-            file_path = list(event)
-        else:
-            file_path = event.data
-            if file_type not in file_path:
-                k = 0
-                inner_frame.config(height=main_canvas.winfo_height(), width=main_canvas.winfo_width(), bg='#616161')
-                inner_frame.pack_propagate(False)
-                label = Label(
-                    inner_frame,
-                    bg='#616161',
-                    text="Yanlış dosya tipi algılandı!",
-                    fg='white'
-                )
-                label.pack(side=LEFT,fill=BOTH, expand=True)
-                def destroy():
-                    label.destroy()
-                    inner_frame.config(height=0, bg='#D9D9D9')
-                    inner_frame.pack_propagate(True)
-                win.after(1000, destroy)
-        z = 0
-        if type(event) == tuple or event == '':
-            file_path = list(event)
-            z=1
-        else:
-            file_path = event.data.strip().split(file_type)
-            z=0
-        for i in file_path:
-            if '{' or '}' in i:
-                i = i.replace('{', "")
-                i = i.replace('}', "")
-            if i != '':
-                if i[0] == ' ':
-                    i = i[1:]
-                if z == 0:
-                    i = i + file_type
-                if i not in dosyalar_dictionary[dict_name] and k == 1:
-                    inner_frame.grid_propagate(True)
-                    dosyalar_dictionary[dict_name].append(i)
-                    buttons_frame = Frame(inner_frame, highlightbackground='black', highlightthickness=1, height=30, padx=0, pady=0, width= drop_canvas.winfo_width())
-                    excel_image = Label(buttons_frame, image=file_image)
-                    excel_image.pack(side=LEFT)
-                    button = Button(buttons_frame, text=i, font=("JetBrainsMonoRoman Regular", 15 * -1), height=1, border= 0, anchor='w')
-                    inner_frame.columnconfigure(0, weight=1, minsize=drop_canvas.winfo_width())
-                    buttons_frame.grid(column=0, row=dosyalar_dictionary[dict_name].index(i), columnspan=2, padx=0, pady=0, sticky='nswe')
-                    button.pack(side=RIGHT, fill=BOTH, expand=True)
-                    parent.update_idletasks()
-                    button_width = button.winfo_width()
-                    inner_frame.grid_propagate(False)
-                    buttons_frame.config(height=30)
-                    buttons_frame.pack_propagate(False)
-
-
-                    button_tik = Button(buttons_frame,image=image_dictionary['sil_button_image'], border=0, width=35, command=lambda b= button, db = None, bl = None: delete_button_func(b, db, bl))
-                    button_tik.config(command=lambda bf = buttons_frame, b=button, bl=button_list: delete_button_func(bf, b, bl))
-
-                    def ustunde(event, buttons_frame, button, button_tik):
-
-                        button_tik.place(x=0,y=1)
-                        buttons_frame.update()
-                        index = dosyalar_dictionary[dict_name].index(button.cget('text'))
-                        buttons_frame.update_idletasks()
-                        buttons_frame.bind('<Leave>', lambda e: degil(e, button_tik))
-                    def degil(event, button_tik):
-                        try:
-                            button_tik.place_forget()
-                        except:pass
-                        buttons_frame.update_idletasks()
-                    def delete_button_func(buttons_frame, button, button_list):
-                        for button1 in button_list:
-                            if button1[0] == button:
-                                button_list.remove(button1)
-                        i = button.cget('text')
-                        dosyalar_dictionary[dict_name].remove(i)
-                        button.destroy()
-                        buttons_frame.destroy()
-
-                        if len(dosyalar_dictionary[dict_name]) == 0:
-                            inner_frame.config(height=0)
-                        else:
-                            update_buttons()
-                        # Tuşlar silindiği için frame güncellenmeli
-                    def update_buttons():
-                        for button in button_list:
-                            i = button[0].cget('text')
-                            button[2].grid_configure(row=dosyalar_dictionary[dict_name].index(i))
-                            #parent.update_idletasks()
-                            button_width = button[0].winfo_width()
-                            '''
-                            if len(dosyalar_dictionary[dict_name]) == 0:
-                                inner_frame.config(height=0)
-                            elif 20+30*len(dosyalar_dictionary[dict_name]) > drop_canvas.winfo_height():
-                                inner_frame.config(height=20+30*len(dosyalar_dictionary[dict_name]))
-                            else:
-                                inner_frame.config(height=drop_canvas.winfo_height())
-                            button[2].config(width= inner_frame.winfo_width())
-                            '''
-                            #parent.update_idletasks()
-                    def update_size(button_list, inner_frame):
-                        inner_frame.update()
-                        for i in button_list:
-                            i[2].config(width= inner_frame.winfo_width())
-                            parent.update_idletasks()
-
-                    button_list.append([button, 'h', buttons_frame])
-
-                    #button_tik.place(x=button_width + 15, y=2+30*(dosyalar_dictionary[dict_name].index(i)))
-                    #button_tik.place(x=button_width + 15, y=0)
-                    buttons_frame.bind('<Enter>', lambda e, bf = buttons_frame, b = button, bt=button_tik : ustunde(e, bf, b, bt))
-                    parent.update_idletasks()
-                    inframe_width = drop_canvas.winfo_width()
-                    buttons_frame.configure(width=button.winfo_width()+30)
-                    parent.update_idletasks()
-                    toplam = buttons_frame.winfo_width()
-                    if (10+(30*(len(dosyalar_dictionary[dict_name])))) > drop_canvas.winfo_height():
-                        inner_frame.config(height=10+(30*(len(dosyalar_dictionary[dict_name]))))
-                    else:
-                        inner_frame.config(height=drop_canvas.winfo_height()-5)
-                    if toplam > inframe_width:
-                        scrollbar_h.grid(column=0, row=1, sticky='ew')
-                        inner_frame.config(width=toplam)
-
-                    #update_size(button_list, inner_frame)
-                    #parent.update_idletasks()
-    main_frame = Frame(parent,background='#3F4042', borderwidth=0, relief="solid", highlightcolor='#3F4042', highlightthickness=6, highlightbackground='#3F4042')
-    main_frame.grid(column = column, row = row, columnspan=2, sticky='nwes', padx=padx)
-    main_canvas= Canvas(main_frame, bg='white')
-    main_canvas.pack(side=LEFT, fill=BOTH, expand=True)
-    drop_canvas = Canvas(main_canvas, bg='white', height= 150)
-
-    if bg_image == 0:
-        image_dictionary['drag_drop_image'] = PhotoImage(file=relative_to_assets("image_6.png"))
-        bg_image = image_dictionary['drag_drop_image']
-    else:pass
-    main_canvas.grid_columnconfigure(0, weight=1)
-    main_canvas.grid_rowconfigure(0, weight=1)
-    drop_canvas.grid(column = 0, row = 0, sticky='nsew')
-    drop_canvas.pack_propagate(False)
-    drag_drop_label = Label(drop_canvas, bg='#D9D9D9')
-    drag_drop_label.background_image = bg_image
-    drag_drop_label.config(image=bg_image)
-    drag_drop_label.pack(side=LEFT, fill=BOTH, expand=True)
-
-
-    scrollbar_v = Scrollbar(main_canvas, orient=VERTICAL, command=drop_canvas.yview)
-    scrollbar_v.grid(column = 1, row = 0, sticky='ns')
-    drop_canvas.config(yscrollcommand=scrollbar_v.set)
-
-    scrollbar_h = Scrollbar(main_canvas, orient=HORIZONTAL, command=drop_canvas.xview)
-
-    drop_canvas.config(xscrollcommand=scrollbar_h.set)
-
-    inner_frame = Frame(drop_canvas, bg='#D9D9D9', height=0, width=main_canvas.winfo_width())
-    drop_canvas.create_window((0, 0), window=inner_frame, anchor="nw")
-    def config(e):
-        inner_frame.config(width=e.width)
-    inner_frame.bind("<Configure>", lambda e: drop_canvas.config(scrollregion=drop_canvas.bbox('all')))
-    main_canvas.bind("<Configure>", lambda e: config(e))
-    a=0
-    # Sürükle bırak işlemi için hedef belirleme
-    def drop_canvas_click(event):
-        if file_type == ".xlsx":
-            file_path = filedialog.askopenfilename(
-                parent=win,
-                title="Bir Excel dosyası seçin",
-                filetypes=[("Excel Files", "*.xlsx *.xls")],  # Sadece Excel dosyalarını filtreler
-                multiple=True
-            )
-        else:
-            file_path = filedialog.askopenfilename(
-                parent=win,
-                title="Bir Excel dosyası seçin",
-                filetypes=[("Excel Files", "*{}".format(file_type))],  # Sadece Excel dosyalarını filtreler
-                multiple=True
-            )
-        drop(file_path)
-    drag_drop_label.bind('<Button-1>', drop_canvas_click)
-    drop_canvas.drop_target_register(DND_FILES)
-
-    drop_canvas.dnd_bind('<<Drop>>', lambda e: drop(e))
-    return [main_frame, surukle_text]
-
-
-def ham_drag_drop2(row1,row,column,dict_name,text,parent):
-    dosyalar_dictionary[dict_name] = []
-    button_list = []
-    sil_button_image = PhotoImage(
-        file=relative_to_assets("image_3.png"),
-        width=35,
-        height=25
-    )
-    excel_dosya_image = PhotoImage(
-        file=relative_to_assets("image_5.png")
-    )
-    surukle_text = Label(parent, text=text, background=color, fg=canvas2_text_color,)
-    surukle_text.grid(column=column, row=row1, columnspan=2, padx=25, pady=10, sticky='w')
-    def on_frame_enter(event):
-        canvas2.unbind_all("<MouseWheel>")
-        drop_canvas.bind_all("<MouseWheel>", on_mouse_wheel_frame)
-
-    def on_frame_leave(event):
-        canvas2.bind_all("<MouseWheel>", on_mouse_wheel)
-    def drag():
-        main_canvas.yview_scroll(10, "units")
-    def on_mouse_wheel_frame(event):
-        drop_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-
-
-
-    def drop(event):
-        main_frame.bind("<Enter>", on_frame_enter)
-        main_frame.bind("<Leave>", on_frame_leave)
-        drop_canvas.bind_all("<MouseWheel>", on_mouse_wheel_frame)
-        drop_canvas.config(scrollregion=drop_canvas.bbox('all'))
-
-        k = 1
-        if type(event) == tuple or event == '':
-            file_path = event
-        else:
-            file_path = event.data
-            if '.xlsx' not in file_path:
-                k = 0
-                inner_frame.config(height=main_canvas.winfo_height(), width=main_canvas.winfo_width(), bg='#616161')
-                inner_frame.pack_propagate(False)
-                label = Label(
-                    inner_frame,
-                    bg='#616161',
-                    text="Yanlış dosya tipi algılandı!",
-                    fg='white'
-                )
-                label.pack(side=LEFT,fill=BOTH, expand=True)
-                def destroy():
-                    label.destroy()
-                    inner_frame.config(height=0, bg='#D9D9D9')
-                    inner_frame.pack_propagate(True)
-                window.after(1000, destroy)
-        z = 0
-        if type(event) == tuple or event == '':
-            file_path = event
-            z = 1
-        else:
-            file_path = event.data.strip().split('.xlsx')
-            z = 0
-        for i in file_path:
-            if '{' or '}' in i:
-                i = i.replace('{', "")
-                i = i.replace('}', "")
-            if i != '':
-                if i[0] == ' ':
-                    i = i[1:]
-                if z == 0:
-                    i = i + ".xlsx"
-                if i not in dosyalar_dictionary[dict_name] and k == 1:
-                    def button_click(event):
-                        var.set('1')
-                        vary.set(event.y)
-                    def button_release(event):
-                        var.set('0')
-                        to = int(surukle_line.grid_info()['row']/2)
-                        index = dosyalar_dictionary[dict_name].index(event.widget.cget('text'))
-                        print(index)
-                        tasi(dosyalar_dictionary[dict_name], index, to)
-                        surukle_line.grid_forget()
-
-
-                    def button_motion(event):
-                        if var.get() == '1':
-                            y = event.y
-                            if y >= 0:
-                                which_file = int((y+vary.get())/30)
-                            else:
-                                which_file = int((y-vary.get())/30)
-                            #print(which_file)
-                            which_row = (2*which_file)
-
-                            row = event.widget.master.grid_info()['row']+which_row - 1
-                            if row < 0:
-                                row =0
-                            surukle_line.grid(column=0, row=row, sticky='ew')
-                            '''elif y > 15 and y <=30:
-                                row = event.widget.master.grid_info()['row']+which_row + 1
-                                print(row)
-                                surukle_line.grid(column=0, row=row, sticky='ew')'''
-                    inner_frame.grid_propagate(True)
-                    dosyalar_dictionary[dict_name].append(i)
-                    buttons_frame = Frame(inner_frame, highlightbackground='black', highlightthickness=1, height=30, padx=0, pady=0, width= drop_canvas.winfo_width())
-                    excel_image = Label(buttons_frame, image=excel_dosya_image)
-                    excel_image.pack(side=LEFT)
-                    button = Label(buttons_frame, text=i, font=("JetBrainsMonoRoman Regular", 15 * -1), height=1, border= 0, anchor='w')
-                    inner_frame.columnconfigure(0, weight=1, minsize=drop_canvas.winfo_width())
-                    buttons_frame.grid(column=0, row=2*dosyalar_dictionary[dict_name].index(i)+1, columnspan=2, padx=0, pady=0, sticky='nswe')
-                    button.pack(side=RIGHT, fill=BOTH, expand=True)
-                    button.bind("<Button-1>", button_click)
-                    button.bind("<ButtonRelease-1>", button_release)
-                    button.bind("<B1-Motion>", lambda e: button_motion(e))
-
-                    #button.bind("<<ButtonRelease-1>>", button_release())
-
-                    parent.update_idletasks()
-                    button_width = button.winfo_width()
-                    inner_frame.grid_propagate(False)
-                    buttons_frame.config(height=30)
-                    buttons_frame.pack_propagate(False)
-
-                    var = tk.StringVar()
-                    var.set('0')
-                    vary = tk.IntVar()
-
-                    def tasi(lst, from_index, to_index):
-                        if from_index < 0 or from_index >= len(lst):
-                            raise IndexError("from_index is out of bounds")
-                        if to_index < 0 or to_index >= len(lst):
-                            raise IndexError("to_index is out of bounds")
-
-                        # Öğeyi çıkart ve yeni konuma ekle
-                        item = lst.pop(from_index)
-                        lst.insert(to_index, item)
-
-                        update_buttons()
-                    button_tik = Button(buttons_frame,image=sil_button_image, border=0, width=35, command=lambda b= button, db = None, bl = None: delete_button_func(b, db, bl))
-                    button_tik.config(command=lambda bf = buttons_frame, b=button, bl=button_list: delete_button_func(bf, b, bl))
-                    yukari_button = Button(
-                        buttons_frame,
-                        text='yukari',
-                    )
-                    asagi_button = Button(
-                        buttons_frame,
-                        text='asagi',
-                    )
-                    def ustunde(event, buttons_frame, button, button_tik, yukari_button, asagi_button):
-
-                        button_tik.place(x=0,y=1)
-                        buttons_frame.update()
-                        index = dosyalar_dictionary[dict_name].index(button.cget('text'))
-                        yukari_button.config(command= lambda: tasi(dosyalar_dictionary[dict_name], index, index-1))
-                        asagi_button.config(command= lambda: tasi(dosyalar_dictionary[dict_name], index, index+1))
-                        yukari_button.place(
-                            x=button_tik.winfo_width()+5,
-                            y = 0
-                        )
-
-                        asagi_button.place(
-                            x=button_tik.winfo_width()+55,
-                            y = 0
-                        )
-
-                        buttons_frame.update_idletasks()
-                        buttons_frame.bind('<Leave>', lambda e: degil(e, button_tik, asagi_button, yukari_button))
-                    def degil(event, button_tik, asagi_button, yukari_button):
-                        try:
-                            button_tik.place_forget()
-                        except:
-                            pass
-                        try:
-                            yukari_button.place_forget()
-                        except:
-                            pass
-                        try:
-                            asagi_button.place_forget()
-                        except:
-                            pass
-                        buttons_frame.update_idletasks()
-                    def delete_button_func(buttons_frame, button, button_list):
-                        for button1 in button_list:
-                            if button1[0] == button:
-                                button_list.remove(button1)
-                        i = button.cget('text')
-                        dosyalar_dictionary[dict_name].remove(i)
-                        button.destroy()
-                        buttons_frame.destroy()
-
-                        if len(dosyalar_dictionary[dict_name]) == 0:
-                            inner_frame.config(height=0)
-                        else:
-                            update_buttons()
-                        # Tuşlar silindiği için frame güncellenmeli
-                    def update_buttons():
-                        for button in button_list:
-                            i = button[0].cget('text')
-                            button[2].grid_configure(row=2*(dosyalar_dictionary[dict_name].index(i))+1)
-                            #parent.update_idletasks()
-                            button_width = button[0].winfo_width()
-                            '''
-                            if len(dosyalar_dictionary[dict_name]) == 0:
-                                inner_frame.config(height=0)
-                            elif 20+30*len(dosyalar_dictionary[dict_name]) > drop_canvas.winfo_height():
-                                inner_frame.config(height=20+30*len(dosyalar_dictionary[dict_name]))
-                            else:
-                                inner_frame.config(height=drop_canvas.winfo_height())
-                            button[2].config(width= inner_frame.winfo_width())
-                            '''
-                            #parent.update_idletasks()
-                    def update_size(button_list, inner_frame):
-                        inner_frame.update()
-                        for i in button_list:
-                            i[2].config(width= inner_frame.winfo_width())
-                            parent.update_idletasks()
-
-                    button_list.append([button, 'h', buttons_frame])
-
-                    #button_tik.place(x=button_width + 15, y=2+30*(dosyalar_dictionary[dict_name].index(i)))
-                    #button_tik.place(x=button_width + 15, y=0)
-                    buttons_frame.bind('<Enter>', lambda e, bf = buttons_frame, b = button, bt=button_tik, y = yukari_button, a = asagi_button: ustunde(e, bf, b, bt, y, a))
-                    parent.update_idletasks()
-                    inframe_width = drop_canvas.winfo_width()
-                    buttons_frame.configure(width=button.winfo_width()+30)
-                    parent.update_idletasks()
-                    toplam = buttons_frame.winfo_width()
-                    if (10+(30*(len(dosyalar_dictionary[dict_name])))) > drop_canvas.winfo_height():
-                        inner_frame.config(height=10+(30*(len(dosyalar_dictionary[dict_name]))))
-                    else:
-                        inner_frame.config(height=drop_canvas.winfo_height()-5)
-                    if toplam > inframe_width:
-                        scrollbar_h.grid(column=0, row=1, sticky='ew')
-                        inner_frame.config(width=toplam)
-
-
-                    #update_size(button_list, inner_frame)
-                    #parent.update_idletasks()
-    main_frame = Frame(parent, background='#3F4042', border=0, relief="solid", highlightcolor='#3F4042', highlightthickness=6, highlightbackground='#3F4042')
-    main_frame.grid(column=column, row=row, columnspan=2, sticky='nwes', padx=25)
-    main_canvas = Canvas(main_frame, bg='white')
-    main_canvas.pack(side=LEFT, fill=BOTH, expand=True)
-    drop_canvas = Canvas(main_canvas, bg='white', height= 150)
-    drag_drop_image = PhotoImage(
-        file=relative_to_assets("image_6.png")
-    )
-    main_canvas.grid_columnconfigure(0, weight=1)
-    main_canvas.grid_rowconfigure(0, weight=1)
-    drop_canvas.grid(column = 0, row = 0, sticky='nsew')
-    drop_canvas.pack_propagate(False)
-    drag_drop_label = Label(drop_canvas, bg='#D9D9D9')
-    drag_drop_label.background_image= drag_drop_image
-    drag_drop_label.config(image=drag_drop_image)
-    drag_drop_label.pack(side=LEFT, fill=BOTH, expand=True)
-
-
-    scrollbar_v = Scrollbar(main_canvas, orient=VERTICAL, command=drop_canvas.yview)
-    scrollbar_v.grid(column = 1, row = 0, sticky='ns')
-    drop_canvas.config(yscrollcommand=scrollbar_v.set)
-
-    scrollbar_h = Scrollbar(main_canvas, orient=HORIZONTAL, command=drop_canvas.xview)
-
-    drop_canvas.config(xscrollcommand=scrollbar_h.set)
-
-    inner_frame = Frame(drop_canvas, bg='#D9D9D9', height=0, width=main_canvas.winfo_width(), border=0, highlightthickness=0)
-    surukle_line = Frame(
-        inner_frame,
-        bg='black',
-        height=5
-    )
-    drop_canvas.create_window((0, 0), window=inner_frame, anchor="nw")
-    def config(e):
-        inner_frame.config(width=e.width)
-    inner_frame.bind("<Configure>", lambda e: drop_canvas.config(scrollregion=drop_canvas.bbox('all')))
-    main_canvas.bind("<Configure>", lambda e: config(e))
-    a=0
-    def drop_canvas_click(event):
-        file_path = filedialog.askopenfilename(
-            parent=window,
-            title="Bir Excel dosyası seçin",
-            filetypes=[("Excel Files", "*.xlsx *.xls")],  # Sadece Excel dosyalarını filtreler
-            multiple=True
-        )
-        drop(file_path)
-    drag_drop_label.bind('<Button-1>', drop_canvas_click)
-    # Sürükle bırak işlemi için hedef belirleme
-    drop_canvas.drop_target_register(DND_FILES)
-
-    drop_canvas.dnd_bind('<<Drop>>', lambda e: drop(e))
-
-    return [main_frame, surukle_text]
 
 def is_connected_whenstart():
     try:
@@ -5065,6 +3717,7 @@ def is_connected_whenstart():
             tk.messagebox.showinfo("Version", f"New version available: {latest_version}!")
     except:
         pass
+
 def is_connected(CURRENT_VERSION, progress_bar, progress_label, doyouwanna_frame, label, yuklebutton, releasebutton):
 
     try:
@@ -5093,7 +3746,6 @@ def start_download(url, progress_bar, progress_label):
     temp_dir = tempfile.gettempdir()
     update_save_path = os.path.join(temp_dir, "KWIEKLLC_update.exe")
     download_file_with_progress(url, update_save_path, progress_bar, progress_label)
-
 
 def application_updater(CURRENT_VERSION, progress_bar, progress_label, doyouwanna_frame, label:tk.Label, yuklebutton, releasebutton):
     def baslat_click(e,c,t, i):
@@ -5185,7 +3837,6 @@ def application_updater(CURRENT_VERSION, progress_bar, progress_label, doyouwann
             else:
                 item.grid_forget()
         doyouwanna_frame.grid(column=0, row=2, sticky='w')
-
 
 if __name__ == '__main__':
     freeze_support()
@@ -5285,9 +3936,7 @@ if __name__ == '__main__':
         'packsize = PackSize\n'
         'brand = Brand\n'
         'description = Description\n')
-    tsv_settings_var = (
-        "columns = Merchant SKU, Title, ASIN, FNSKU, external-id, Condition, Shipped"
-    )
+
     expration_settings_var = (
         'login_button_id = mainForm:j_idt23, mainForm:j_idt13\n'
         'email_id = mainForm:email\n'
@@ -5300,54 +3949,7 @@ if __name__ == '__main__':
         'shipquantity = ShipQuantity\n'
         'date = InvoiceDate'
     )
-    costupdater2_settings_var = (
-        'cost = cost\n'
-        'sku = sku\n'
-        'additional cost = additional_cost\n'
-        'business pricing = business_pricing\n'
-        'bp strategy = bp_strategy\n'
-        'qd strategy = qd_strategy\n'
-        'pkg volume = pkg_volume\n'
-        'pkg weight = pkg_weight\n'
-        '====================================\n'
-        'DC_NAME: ADDITIONAL_COST EQUATION_NUMBER DEPOSIT_COST\n'
-        'BX: 0 2 0.70\n'
-        'CANDY: 0 2 0.70\n'
-        'COS: 0 2 0.70\n'
-        'CS: 0 2 0.70\n'
-        'CSC: 0 2 0.70\n'
-        'DL: 0 2 0.70\n'
-        'FC: 0 2 0.70\n'
-        'FD: 0 2 0.70\n'
-        'FL: 0 1 0.70\n'
-        'FOUR: 0 2 0.70\n'
-        'FR: 0 2 0.70\n'
-        'GEMCO: 0 2 0.70\n'
-        'IL: 0 1 0.70\n'
-        'JC: 0 2 0.70\n'
-        'KH: 0 2 0.70\n'
-        'LR: 0 2 0.70\n'
-        'MD: 0 1 0.70\n'
-        'MONIN PUMP SL: 0 2 0.70\n'
-        'NC: 0 2 0.70\n'
-        'NF: 0 2 0.70\n'
-        'NJ: 0 2 0.70\n'
-        'NK: 0 2 0.70\n'
-        'NT: 0 2 0.70\n'
-        'SN: 0 2 0.70\n'
-        'UC: 0 2 0.70\n'
-        'UD: 0 2 0.70\n'
-        'UN: 0 2 0.70\n'
-        'UPC: 0 2 0.70\n'
-        'WB: 0 2 0.70\n'
-        'WEBS: 0 2 0.70\n'
-        'TD: 0 2 0.70\n'
-        'IN: 0 1 0.70\n'
-        'BL: 0 2 0.70\n'
-        'YT: 0 1 0.70\n'
-        'BZ: 0 1 0.70\n'
-        'MI: 0 2 0.70'
-    )
+    
     costupdater_settings_var = (
         'cost = cost\n'
         'sku = sku\n'
@@ -5520,8 +4122,8 @@ if __name__ == '__main__':
     )
     button_1.grid(column=0, row=6)
 
-    button_1.bind('<Enter>', lambda event: button_hover(event, button_1))
-    button_1.bind('<Leave>', lambda event: button_leave(event, button_1))
+    button_1.bind('<Enter>', lambda event: button_hover(event, button_1, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_1.bind('<Leave>', lambda event: button_leave(event, button_1, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_1.bind("<Button-1>", lambda e: button(canvas2, button_1))
     button_1_line = Frame(canvas, height=2, bg=line_color)
     button_1_line.grid(column=0, row=7, sticky='ew')
@@ -5539,8 +4141,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_2.grid(column=0, row=8)
-    button_2.bind('<Enter>', lambda event: button_hover(event, button_2))
-    button_2.bind('<Leave>', lambda event: button_leave(event, button_2))
+    button_2.bind('<Enter>', lambda event: button_hover(event, button_2, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_2.bind('<Leave>', lambda event: button_leave(event, button_2, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_2.bind("<Button-1>", lambda e: button(canvas2, button_2))
     button_2_line = Frame(canvas, height=2, bg=line_color)
     button_2_line.grid(column=0, row=9, sticky='ew')
@@ -5558,8 +4160,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_3.grid(column=0, row=10)
-    button_3.bind('<Enter>', lambda event: button_hover(event, button_3))
-    button_3.bind('<Leave>', lambda event: button_leave(event, button_3))
+    button_3.bind('<Enter>', lambda event: button_hover(event, button_3, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_3.bind('<Leave>', lambda event: button_leave(event, button_3, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_3.bind("<Button-1>", lambda e: button(canvas2, button_3))
     button_3_line = Frame(canvas, height=2, bg=line_color)
     button_4 = MyButton(
@@ -5576,8 +4178,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_4.grid(column=0, row=4)
-    button_4.bind('<Enter>', lambda event: button_hover(event, button_4))
-    button_4.bind('<Leave>', lambda event: button_leave(event, button_4))
+    button_4.bind('<Enter>', lambda event: button_hover(event, button_4, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_4.bind('<Leave>', lambda event: button_leave(event, button_4, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_4.bind("<Button-1>", lambda e: button(canvas2, button_4))
     button_4_line = Frame(canvas, height=2, bg=line_color)
     button_4_line.grid(column=0, row=5, sticky='ew')
@@ -5596,8 +4198,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_5.grid(column=0, row=0, pady=(30,0))
-    button_5.bind('<Enter>', lambda event: button_hover(event, button_5))
-    button_5.bind('<Leave>', lambda event: button_leave(event, button_5))
+    button_5.bind('<Enter>', lambda event: button_hover(event, button_5, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_5.bind('<Leave>', lambda event: button_leave(event, button_5, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_5.bind("<Button-1>", lambda e: button(canvas2, button_5))
     button_5_line1 = Frame(canvas, height=2, bg=line_color)
     button_5_line2 = Frame(canvas, height=2, bg=line_color)
@@ -5622,8 +4224,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_6.grid(column=0, row=12)
-    button_6.bind('<Enter>', lambda event: button_hover(event, button_6))
-    button_6.bind('<Leave>', lambda event: button_leave(event, button_6))
+    button_6.bind('<Enter>', lambda event: button_hover(event, button_6, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_6.bind('<Leave>', lambda event: button_leave(event, button_6, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_6.bind("<Button-1>", lambda e: button(canvas2, button_6))
 
     button_7_line = Frame(canvas, height=2, bg=line_color)
@@ -5642,8 +4244,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_7.grid(column=0, row=14)
-    button_7.bind('<Enter>', lambda event: button_hover(event, button_7))
-    button_7.bind('<Leave>', lambda event: button_leave(event, button_7))
+    button_7.bind('<Enter>', lambda event: button_hover(event, button_7, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_7.bind('<Leave>', lambda event: button_leave(event, button_7, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_7.bind("<Button-1>", lambda e: button(canvas2, button_7))
 
     button_8_line = Frame(canvas, height=2, bg=line_color)
@@ -5663,8 +4265,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_8.grid(column=0, row=16)
-    button_8.bind('<Enter>', lambda event: button_hover(event, button_8))
-    button_8.bind('<Leave>', lambda event: button_leave(event, button_8))
+    button_8.bind('<Enter>', lambda event: button_hover(event, button_8, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_8.bind('<Leave>', lambda event: button_leave(event, button_8, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_8.bind("<Button-1>", lambda e: button(canvas2, button_8))
 
     button_9_line = Frame(canvas, height=2, bg=line_color)
@@ -5683,8 +4285,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_9.grid(column=0, row=22)
-    button_9.bind('<Enter>', lambda event: button_hover(event, button_9))
-    button_9.bind('<Leave>', lambda event: button_leave(event, button_9))
+    button_9.bind('<Enter>', lambda event: button_hover(event, button_9, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_9.bind('<Leave>', lambda event: button_leave(event, button_9, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_9.bind("<Button-1>", lambda e: button(canvas2, button_9))
 
     button_10_line = Frame(canvas, height=2, bg=line_color)
@@ -5703,8 +4305,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_10.grid(column=0, row=18)
-    button_10.bind('<Enter>', lambda event: button_hover(event, button_10))
-    button_10.bind('<Leave>', lambda event: button_leave(event, button_10))
+    button_10.bind('<Enter>', lambda event: button_hover(event, button_10, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_10.bind('<Leave>', lambda event: button_leave(event, button_10, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_10.bind("<Button-1>", lambda e: button(canvas2, button_10))
 
     button_11_line = Frame(canvas, height=2, bg=line_color)
@@ -5723,8 +4325,8 @@ if __name__ == '__main__':
         text_pad=pad
     )
     button_11.grid(column=0, row=20)
-    button_11.bind('<Enter>', lambda event: button_hover(event, button_11))
-    button_11.bind('<Leave>', lambda event: button_leave(event, button_11))
+    button_11.bind('<Enter>', lambda event: button_hover(event, button_11, dictionary, button_5, program_icon_hover, home_icon_hover))
+    button_11.bind('<Leave>', lambda event: button_leave(event, button_11, dictionary, color, button_5, program_icon_notselected, home_icon_notselected))
     button_11.bind("<Button-1>", lambda e: button(canvas2, button_11))
     dictionary = {
         button_1: 0,
