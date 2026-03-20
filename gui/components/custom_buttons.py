@@ -275,6 +275,8 @@ class MyButton:
         self.canvas.grid_forget()
     def bind(self, *args, **kwargs):
         self.canvas.bind(*args, **kwargs)
+    def unbind(self, *args, **kwargs):
+        self.canvas.unbind(*args, **kwargs)
     def winfo_x(self):
         return self.canvas.winfo_x()
     def winfo_y(self):

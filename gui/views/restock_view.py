@@ -6,12 +6,13 @@ import os
 
 from utils.file_operations import browse_directory, placeholder_saver, path_text_function, write_settings, save_location_saver
 from utils.event_handlers import on_focus_in, on_focus_out, on_click_outside, on_mouse_wheel, on_text_enter, on_text_leave
-from utils.gui_helpers import width_f
+from utils.gui_helpers import width_f, text_print, open_folder_in_explorer
 from gui.components.custom_buttons import MyButton
 from gui.components.scrollbar import MyScrollbar
 from gui.components.drag_drop import drag_drop, ham_drag_drop2
 from gui.components.custom_buttons import SwitchButton
 from gui.views.futureprice_view import render_futureprice_view
+from core.restock_processor import process_restock_logic
 
 
 from tkinter import PhotoImage
@@ -40,11 +41,6 @@ settings_var = (
     "01 cost: 1.10\n"
     "01 standart: 1.10\n"
     "NF: 0.78")
-
-def start_excel_editor_thread(ham_liste,export_liste,restock_liste,path,islem, restock_output, save_name, progress):
-    t = Thread(target=rest, args=(path, ham_liste, export_liste, restock_liste, islem, progress, restock_output, save_name), daemon=True)
-    t.start()
-
 
 def render_restock_view(canvas, canvas2, window, color, line_color, canvas2_text_color, dosyalar_dictionary, resize_dictionary, active_dictionary, main_frame_resize):
     global restock_submit_button
@@ -474,10 +470,31 @@ def render_restock_view(canvas, canvas2, window, color, line_color, canvas2_text
         progress.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(),0))
 
         if path != "Example: C:/Users/Username/Desktop/sonuc":
-            start_excel_editor_thread(n_ham_dosyalar_liste,n_export_dosyalar_liste,n_restock_dosyalar_liste,path,active_dictionary,restock_output, save_name, progress)
+            def update_progress(msg: str, percent: int):
+                # UI güncellemeleri ana thread'e (window.after) zorunlu olarak devredilir.
+                window.after(0, lambda: text_print(restock_output, msg))
+                window.after(0, lambda: progress.configure(value=percent))
+
+            def run_in_thread():
+                try:
+                    result = process_restock_logic(
+                        path=path,
+                        row_files=n_ham_dosyalar_liste,
+                        export_files=n_export_dosyalar_liste,
+                        restock_files=n_restock_dosyalar_liste,
+                        islem=active_dictionary,
+                        save_name=save_name,
+                        progress_callback=update_progress
+                    )
+                    window.after(0, lambda: text_print(restock_output, result["message"], color='#90EE90'))
+                    window.after(0, lambda p=result["output_path"]: open_folder_in_explorer(p))
+                except Exception as e:
+                    window.after(0, lambda: text_print(restock_output, f"Hata: {str(e)}", color='red'))
+
+            conversion_thread = Thread(target=run_in_thread, daemon=True)
+            conversion_thread.start()
         else:
-            restock_output.insert(END, 'dosya yolunu dogru girdiginizden emin olun ve tekrar deneyin...\n')
-            restock_output.see(END)
+            text_print(restock_output, 'Hata: Dosya yolunu doğru girdiğinizden emin olun ve tekrar deneyin...', color='red')
         window.unbind('<Configure>')
         submit_resize(1)
         window.bind('<Configure>', submit_resize)

@@ -4,9 +4,10 @@ import os
 
 from utils.file_operations import browse_directory, placeholder_saver, path_text_function, write_settings
 from utils.event_handlers import on_focus_in, on_focus_out, on_click_outside, on_mouse_wheel
-from utils.gui_helpers import text_print
+from utils.gui_helpers import text_print, open_folder_in_explorer
 from gui.components.custom_buttons import MyButton
 from gui.components.scrollbar import MyScrollbar
+from core.expiration_processor import process_expiration
 
 
 import tkinter as tk
@@ -20,11 +21,6 @@ expration_settings_var = (
     'default_email = sales@buyable.net\n'
     'default_password = hasali2603\n'
 )
-
-def start_expration_thread(username_entry, password_entry, output_text, path, item_ids):
-    t = Thread(target=expration, args=(username_entry, password_entry, output_text, path, item_ids), daemon=True)
-    t.start()
-
 
 def render_expration_view(canvas, canvas2, window, color, line_color, canvas2_text_color, main_frame_resize):
     def color_change(e,c,t,b):
@@ -54,7 +50,24 @@ def render_expration_view(canvas, canvas2, window, color, line_color, canvas2_te
         elif item_ids == '':
             text_print(output_text, "Lütfen düzgün bir shipment id değeri giriniz.")
         else:
-            start_expration_thread(username, password, output_text, path, item_ids)
+            def update_progress(msg: str, color="white"):
+                window.after(0, lambda: text_print(output_text, msg, color=color))
+
+            def run_in_thread():
+                try:
+                    result = process_expiration(
+                        username=username,
+                        password=password,
+                        item_ids_str=item_ids,
+                        output_path=path,
+                        progress_callback=update_progress
+                    )
+                    window.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                    window.after(0, lambda p=result["output_path"]: open_folder_in_explorer(p))
+                except Exception as e:
+                    window.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+            Thread(target=run_in_thread, daemon=True).start()
         window.bind("<Configure>", lambda e: expration_resize(e, 1))
     def expration_resize(e, isactive):
         scale = main_frame_resize()
