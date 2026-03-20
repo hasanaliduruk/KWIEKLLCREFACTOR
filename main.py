@@ -11,6 +11,7 @@ from gui.components.choosers import ConvertChooser, PathAdressGroup
 from gui.components.custom_buttons import MyButton, SwitchButton
 from gui.components.option_menu import CustomOptionMenu
 from gui.components.scrollbar import MyScrollbar
+from core.cost_updater import process_costupdater, process_costupdater2
 
 import socket
 from threading import Thread
@@ -4114,542 +4115,6 @@ def button_tsv(canvas2):
     canvas2.config(scrollregion=canvas2.bbox('all'))
     window.bind("<Configure>", lambda e: tsv_resize(e, False))
 
-
-def costupdater_script(path, output_text):
-    def settings_creater():
-        with open('Settings/costupdater_settings.txt', 'w', encoding='utf-8') as file:
-            file.write('cost = cost\n'
-                       'sku = sku\n'
-                       'additional cost = additional_cost\n'
-                       'business pricing = business_pricing\n'
-                       'bp strategy = bp_strategy\n'
-                       'qd strategy = qd_strategy\n'
-                       '====================================\n'
-                       'BX: 0.3\n'
-                       'CANDY: 0.3\n'
-                       'COS: 0.3\n'
-                       'CS: 0.3\n'
-                       'CSC: 0.3\n'
-                       'DL: 0.3\n'
-                       'FC: 0.3\n'
-                       'FD: 0.3\n'
-                       'FL: 0.75\n'
-                       'FOUR: 0.3\n'
-                       'FR: 0.3\n'
-                       'GEMCO: 0.3\n'
-                       'IL: 0.75\n'
-                       'JC: 0.3\n'
-                       'KH: 0.3\n'
-                       'LR: 0.3\n'
-                       'MD: 0.75\n'
-                       'MONIN PUMP SL: 0.3\n'
-                       'NC: 0.3\n'
-                       'NF: 0.3\n'
-                       'NJ: 0.3\n'
-                       'NK: 0.3\n'
-                       'NT: 0.3\n'
-                       'SN: 0.3\n'
-                       'UC: 0.3\n'
-                       'UD: 0.3\n'
-                       'UN: 0.3\n'
-                       'UPC: 0.3\n'
-                       'WB: 0.3\n'
-                       'WEBS: 0.3\n')
-    def settings_reader():
-        columns_dictionary = {
-            'cost': [],
-            'additional cost': [],
-            'bp strategy': [],
-            'qd strategy': [],
-            'business pricing': [],
-            'sku': []
-        }
-        maliyet_dictionary = {}
-        with open('Settings/costupdater_settings.txt', 'r', encoding='utf-8') as file:
-            lines_list = []
-            for line in file.readlines():
-                lines_list.append(line)
-
-            #IDENTIFYING COLUMNS FIRST
-            for line in lines_list:
-                line = line.replace('\n', '')
-                if 'sku' == line.split('=', 1)[0] or 'sku ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['sku'].append(deger)
-                if 'cost' == line.split('=', 1)[0] or 'cost ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['cost'].append(deger)
-                if 'additional cost' == line.split('=', 1)[0] or 'additional cost ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['additional cost'].append(deger)
-                if 'bp strategy' == line.split('=', 1)[0] or 'bp strategy ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['bp strategy'].append(deger)
-                if 'qd strategy' == line.split('=', 1)[0] or 'qd strategy ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['qd strategy'].append(deger)
-                if 'business pricing' == line.split('=', 1)[0] or 'business pricing ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['business pricing'].append(deger)
-                if '=====' in line:
-                    break
-            #IDENTIFYING MALIYETS SECOND
-            a = 0
-            for line in lines_list:
-                line = line.replace('\n', '')
-
-                if a == 1:
-                    maliyet_dictionary[line.split(':', 1)[0]] = line.split(':', 1)[1].replace(' ', '')
-                if '=====' in line:
-                    a = 1
-
-        return_list = [columns_dictionary, maliyet_dictionary]
-        return return_list
-    def klasor():
-        try:
-            os.mkdir(path+ "/" +'sonuclar')
-        except FileExistsError:
-            pass
-
-    def csv_reader():
-        def wait_for_enter():
-            window.bind("<Return>", on_enter)
-            window.wait_variable(wait_var)
-
-        def on_enter(event):
-            wait_var.set(1)
-
-        wait_var = tk.IntVar()
-        while True:
-            try:
-                df = pd.read_csv(dosyalar_dictionary['costupdater'][0])
-                break
-            except IndexError:
-                text_print(output_text, 'export dosyasi bulunamadi lutfen tekrar denemek icin ENTER basin...')
-                output_text.config(state=tk.NORMAL)
-                wait_for_enter()
-        return df
-    def csv_writer(klasor, df):
-        file = dosyalar_dictionary['costupdater'][0]
-        isim = file.split('/')[-1]
-        df.to_csv(path + "/" +klasor+'/'+'{}'.format(isim), index=False)
-    def df_edit(export_df, columns_dictionary, maliyet_dictionary):
-        def checker(liste, isim, export_df):
-            def wait_for_enter():
-                window.bind("<Return>", on_enter)
-                window.wait_variable(wait_var)
-
-            def on_enter(event):
-                wait_var.set(1)
-
-            wait_var = tk.IntVar()
-            while True:
-                a = 1
-                for col in liste:
-                    if col in export_df.columns:
-                        son_col = col
-                        break
-                    else:
-                        if liste.index(col)+1 == len(liste):
-                            text_print(output_text, 'export dosyasinda {} sutunu bulunamadi lutfen kontrol edip devam etmek icin ENTER\'a basiniz...'.format(isim))
-                            output_text.config(state=tk.NORMAL)
-                            wait_for_enter()
-                            a = 0
-                if a == 1:
-                    break
-                elif a == 0:
-                    export_df = csv_reader()
-                    continue
-            return son_col
-
-        sku_col = checker(columns_dictionary['sku'], 'sku', export_df)
-        cost_col = checker(columns_dictionary['cost'], 'cost', export_df)
-        additional_cost_col = checker(columns_dictionary['additional cost'], 'additional_cost', export_df)
-        bp_strategy_col = checker(columns_dictionary['bp strategy'], 'bp_strategy', export_df)
-        qd_strategy_col = checker(columns_dictionary['qd strategy'], 'qd_strategy', export_df)
-        business_pricing_col = checker(columns_dictionary['business pricing'], 'business_pricing', export_df)
-        export_df = csv_reader()
-        sku = export_df[sku_col].tolist()
-        cost = export_df[cost_col].tolist()
-        additional_cost = export_df[additional_cost_col].tolist()
-        bp_strategy = export_df[bp_strategy_col].tolist()
-        qd_strategy = export_df[qd_strategy_col].tolist()
-        business_pricing = export_df[business_pricing_col].tolist()
-        a = 0
-        for i in sku:
-            split_liste = i.split('_')
-            dc = split_liste[0]
-            price = '#YOK'
-            for z in split_liste[1:]:
-                if '.' in z or ',' in z:
-                    z = z.replace(',', '.')
-                    try:
-                        price = float(z)
-                    except:
-                        price = '#YOK'
-            try:
-                maliyet = maliyet_dictionary[dc]
-            except:
-                text_print(output_text, '{} sku degeri icin ayarlar dosyasinda additional cost degeri bulunamadi \'#YOK\' yazdiriliyor.'.format(i))
-                maliyet = '#YOK'
-            cost[a] = price
-            additional_cost[a] = maliyet
-            bp_strategy[a] = 'AI'
-            qd_strategy[a] = 'default'
-            business_pricing[a] = 'on'
-            a += 1
-
-        export_df[cost_col] = cost
-        export_df[additional_cost_col] = additional_cost
-        export_df[bp_strategy_col] = bp_strategy
-        export_df[qd_strategy_col] = qd_strategy
-        export_df[business_pricing_col] = business_pricing
-        return export_df
-    def main():
-        try:
-            klasor()
-            if 'costupdater_settings.txt' not in os.listdir('Settings'):
-                text_print(output_text, 'ayarlar olusturuluyor...')
-                settings_creater()
-            text_print(output_text, 'ayarlar_cekiliyor...')
-            return_list = settings_reader()
-            columns_dictionary = return_list[0]
-            for key in columns_dictionary.keys():
-                text_print(output_text, str(key) + ' = ' + str(columns_dictionary[key]))
-            maliyet_dictionary = return_list[1]
-            for key in maliyet_dictionary.keys():
-                text_print(output_text, str(key) + ' = ' + str(maliyet_dictionary[key]))
-            text_print(output_text, 'dosya okunuyor...')
-            df = csv_reader()
-            text_print(output_text, 'dosya duzenleniyor...')
-            export_df = df_edit(df, columns_dictionary, maliyet_dictionary)
-            text_print(output_text, 'dosya yazdiriliyor...')
-            csv_writer('sonuclar', export_df)
-            text_print(output_text, 'islem basariyla tamamlandi!')
-            open_folder_in_explorer(path)
-            sys.exit()
-        except Exception:
-            text_print(output_text, 'bir hata meydana geldi.')
-            text_print(output_text, traceback.format_exc(), color='red')
-            sys.exit()
-    main()
-
-def costupdater2_script(path, output_text):
-    def settings_creater():
-        with open('Settings/costupdater2_settings.txt', 'w', encoding='utf-8') as file:
-            file.write('cost = cost\n'
-                       'sku = sku\n'
-                       'additional cost = additional_cost\n'
-                       'business pricing = business_pricing\n'
-                       'bp strategy = bp_strategy\n'
-                       'qd strategy = qd_strategy\n'
-                       'pkg volume = pkg_volume\n'
-                       'pkg weight = pkg_weight\n'
-                       '====================================\n'
-                       'DC_NAME: ADDITIONAL_COST EQUATION_NUMBER DEPOSIT_COST\n'
-                       'BX: 0 2 0.70\n'
-                       'CANDY: 0 2 0.70\n'
-                       'COS: 0 2 0.70\n'
-                       'CS: 0 2 0.70\n'
-                       'CSC: 0 2 0.70\n'
-                       'DL: 0 2 0.70\n'
-                       'FC: 0 2 0.70\n'
-                       'FD: 0 2 0.70\n'
-                       'FL: 0 1 0.70\n'
-                       'FOUR: 0 2 0.70\n'
-                       'FR: 0 2 0.70\n'
-                       'GEMCO: 0 2 0.70\n'
-                       'IL: 0 1 0.70\n'
-                       'JC: 0 2 0.70\n'
-                       'KH: 0 2 0.70\n'
-                       'LR: 0 2 0.70\n'
-                       'MD: 0 1 0.70\n'
-                       'MONIN PUMP SL: 0 2 0.70\n'
-                       'NC: 0 2 0.70\n'
-                       'NF: 0 2 0.70\n'
-                       'NJ: 0 2 0.70\n'
-                       'NK: 0 2 0.70\n'
-                       'NT: 0 2 0.70\n'
-                       'SN: 0 2 0.70\n'
-                       'UC: 0 2 0.70\n'
-                       'UD: 0 2 0.70\n'
-                       'UN: 0 2 0.70\n'
-                       'UPC: 0 2 0.70\n'
-                       'WB: 0 2 0.70\n'
-                       'WEBS: 0 2 0.70\n'
-                       'TD: 0 2 0.70\n'
-                       'IN: 0 1 0.70\n'
-                       'BL: 0 2 0.70\n'
-                       'YT: 0 1 0.70\n'
-                       'BZ: 0 1 0.70\n'
-                       'MI: 0 2 0.70')
-    def settings_reader():
-        columns_dictionary = {
-            'cost': [],
-            'additional cost': [],
-            'bp strategy': [],
-            'qd strategy': [],
-            'business pricing': [],
-            'sku': [],
-            'pkg volume': [],
-            'pkg weight': []
-        }
-        maliyet_dictionary = {}
-        with (open('Settings/costupdater2_settings.txt', 'r', encoding='utf-8') as file):
-            lines_list = []
-            for line in file.readlines():
-                lines_list.append(line)
-
-            #IDENTIFYING COLUMNS FIRST
-            for line in lines_list:
-                line = line.replace('\n', '')
-                if 'sku' == line.split('=', 1)[0] or 'sku ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['sku'].append(deger)
-                elif 'cost' == line.split('=', 1)[0] or 'cost ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['cost'].append(deger)
-                elif 'additional cost' == line.split('=', 1)[0] or 'additional cost ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['additional cost'].append(deger)
-                elif 'bp strategy' == line.split('=', 1)[0] or 'bp strategy ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['bp strategy'].append(deger)
-                elif 'qd strategy' == line.split('=', 1)[0] or 'qd strategy ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['qd strategy'].append(deger)
-                elif 'business pricing' == line.split('=', 1)[0] or 'business pricing ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['business pricing'].append(deger)
-                elif 'pkg volume' == line.split('=', 1)[0] or 'pkg volume ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['pkg volume'].append(deger)
-                elif 'pkg weight' == line.split('=', 1)[0] or 'pkg weight ' == line.split('=', 1)[0]:
-                    line = line.split('=', 1)[1]
-                    degerler = line.split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dictionary['pkg weight'].append(deger)
-                elif '=====' in line:
-                    break
-            #IDENTIFYING MALIYETS SECOND
-            a = 0
-            for line in lines_list:
-                line = line.replace('\n', '')
-
-                if a == 1:
-                    key = line.split(':', 1)[0]
-                    values = line.split(':', 1)[1].lstrip().split(" ")
-                    maliyet_dictionary[key] = {'additional cost': values[0], "equation": values[1], "warehouse fee": values[2]}
-
-                if '=====' in line:
-                    a = 1
-        return [columns_dictionary, maliyet_dictionary]
-    def klasor():
-        try:
-            os.mkdir(path+ "/" +'sonuclar')
-        except FileExistsError:
-            pass
-
-    def csv_reader():
-        def wait_for_enter():
-            window.bind("<Return>", on_enter)
-            window.wait_variable(wait_var)
-
-        def on_enter(event):
-            wait_var.set(1)
-
-        wait_var = tk.IntVar()
-        while True:
-            try:
-                df = pd.read_csv(dosyalar_dictionary['costupdater'][0])
-                break
-            except IndexError:
-                text_print(output_text, 'export dosyasi bulunamadi lutfen tekrar denemek icin ENTER basin...')
-                output_text.config(state=tk.NORMAL)
-                wait_for_enter()
-        return df
-    def csv_writer(klasor, df):
-        file = dosyalar_dictionary['costupdater'][0]
-        isim = file.split('/')[-1]
-        df.to_csv(path + "/" +klasor+'/'+'{}'.format(isim), index=False)
-    def equation(code, value):
-        code = int(code)
-        if code == 1:
-            if (value <= 0.75):
-                return 0.18
-            elif (value <= 1.5):
-                return 0.22
-            elif (value <= 3):
-                return 0.27
-            else:
-                return 0.37
-        elif code == 2:
-            if (value <= 0.75):
-                return 0.34
-            elif (value <= 1.5):
-                return 0.41
-            elif (value <= 3):
-                return 0.49
-            else:
-                return 0.68
-        else:
-            return 0
-
-    def df_edit(export_df, columns_dictionary, maliyet_dictionary):
-        def checker(liste, isim, export_df):
-            def wait_for_enter():
-                window.bind("<Return>", on_enter)
-                window.wait_variable(wait_var)
-
-            def on_enter(event):
-                wait_var.set(1)
-
-            wait_var = tk.IntVar()
-            while True:
-                a = 1
-                for col in liste:
-                    if col in export_df.columns:
-                        son_col = col
-                        break
-                    else:
-                        if liste.index(col)+1 == len(liste):
-                            text_print(output_text, 'export dosyasinda {} sutunu bulunamadi lutfen kontrol edip devam etmek icin ENTER\'a basiniz...'.format(isim))
-                            output_text.config(state=tk.NORMAL)
-                            wait_for_enter()
-                            a = 0
-                if a == 1:
-                    break
-                elif a == 0:
-                    export_df = csv_reader()
-                    continue
-            return son_col
-
-        # DETECT WHETHER GIVEN COLUMNS EXIST.
-        sku_col = checker(columns_dictionary['sku'], 'sku', export_df)
-        cost_col = checker(columns_dictionary['cost'], 'cost', export_df)
-        additional_cost_col = checker(columns_dictionary['additional cost'], 'additional_cost', export_df)
-        bp_strategy_col = checker(columns_dictionary['bp strategy'], 'bp_strategy', export_df)
-        qd_strategy_col = checker(columns_dictionary['qd strategy'], 'qd_strategy', export_df)
-        business_pricing_col = checker(columns_dictionary['business pricing'], 'business_pricing', export_df)
-        pkg_volume_col = checker(columns_dictionary['pkg volume'], 'pkg_volume', export_df)
-        pkg_weight_col = checker(columns_dictionary['pkg weight'], 'pkg_weight', export_df)
-
-        export_df = csv_reader()
-        sku = export_df[sku_col].tolist()
-        cost = export_df[cost_col].tolist()
-        additional_cost = export_df[additional_cost_col].tolist()
-        bp_strategy = export_df[bp_strategy_col].tolist()
-        qd_strategy = export_df[qd_strategy_col].tolist()
-        business_pricing = export_df[business_pricing_col].tolist()
-        pkg_volume = export_df[pkg_volume_col].tolist()
-        pkg_weight = export_df[pkg_weight_col].tolist()
-        a = 0
-        for i in sku:
-            split_liste = i.split('_')
-            dc = split_liste[0]
-            price = ''
-            for z in split_liste[1:]:
-                if '.' in z or ',' in z:
-                    z = z.replace(',', '.')
-                    try:
-                        price = float(z)
-                    except:
-                        price = ''
-            try:
-                maliyet = maliyet_dictionary[dc]["additional cost"]
-                equation_indicator = maliyet_dictionary[dc]["equation"]
-                warehouse_fee = maliyet_dictionary[dc]["warehouse fee"]
-            except:
-                text_print(output_text, '{} sku degeri icin ayarlar dosyasinda additional cost degeri bulunamadi \'#YOK\' yazdiriliyor.'.format(i))
-                maliyet = 0
-                equation_indicator = 0
-                warehouse_fee = 0
-            biggest = float(pkg_volume[a] / 139) if float(pkg_volume[a] / 139) > pkg_weight[a] else pkg_weight[a]
-            if price != "":
-                cost[a] = float(price) + float(equation(int(equation_indicator), float(biggest))) + float(warehouse_fee)
-            else:
-                cost[a] = price
-            additional_cost[a] = maliyet
-            bp_strategy[a] = 'AI'
-            qd_strategy[a] = 'default'
-            business_pricing[a] = 'on'
-            a += 1
-
-        export_df[cost_col] = cost
-        export_df[additional_cost_col] = additional_cost
-        export_df[bp_strategy_col] = bp_strategy
-        export_df[qd_strategy_col] = qd_strategy
-        export_df[business_pricing_col] = business_pricing
-        return export_df
-    def main():
-        try:
-            klasor()
-            if 'costupdater_settings.txt' not in os.listdir('Settings'):
-                text_print(output_text, 'ayarlar olusturuluyor...')
-                settings_creater()
-            text_print(output_text, 'ayarlar_cekiliyor...')
-            return_list = settings_reader()
-            columns_dictionary = return_list[0]
-            for key in columns_dictionary.keys():
-                text_print(output_text, str(key) + ' = ' + str(columns_dictionary[key]))
-            maliyet_dictionary = return_list[1]
-            for key in maliyet_dictionary.keys():
-                text_print(output_text, str(key) + ' = ' + str(maliyet_dictionary[key]))
-            text_print(output_text, 'dosya okunuyor...')
-            df = csv_reader()
-            text_print(output_text, 'dosya duzenleniyor...')
-            export_df = df_edit(df, columns_dictionary, maliyet_dictionary)
-            text_print(output_text, 'dosya yazdiriliyor...')
-            csv_writer('sonuclar', export_df)
-            text_print(output_text, 'islem basariyla tamamlandi!')
-            open_folder_in_explorer(path)
-            sys.exit()
-        except Exception:
-            text_print(output_text, 'bir hata meydana geldi.')
-            text_print(output_text, traceback.format_exc(), color='red')
-            sys.exit()
-    main()
-
 def button_costupdater(canvas2):
     def resize(e, a):
         scale = main_frame_resize()
@@ -4916,26 +4381,77 @@ def button_costupdater(canvas2):
         output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
         window.unbind("<Configure>")
         window.bind("<Configure>", lambda e: resize(e, True))
-        costupdater_ayarlar = settings_text.get("1.0", tk.END)
-        costupdater_ayarlar = costupdater_ayarlar.rstrip("\n")
+        
+        costupdater_ayarlar = settings_text.get("1.0", tk.END).rstrip("\n")
         settings('Settings/costupdater2_settings.txt', costupdater_ayarlar)
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            output_text.insert(END, "path degeri algilanamadi, lutfen dogru bir deger girdiginizden emin olup tekrar deneyiniz.\n")
-            output_text.see(END)
-        else:
-            costupdater2_script_starter(path, output_text)
+        
+        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
+            text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
+            return
+            
+        csv_files = dosyalar_dictionary.get('costupdater', [])
+        if not csv_files:
+            text_print(output_text, "Hata: İşlenecek CSV dosyası sürüklemediniz.", color="red")
+            return
+            
+        input_file = csv_files[0]
+        
+        def update_progress(msg: str):
+            output_text.after(0, lambda: text_print(output_text, msg))
+
+        def run_in_thread():
+            try:
+                result = process_costupdater2(
+                    input_file, 
+                    path, 
+                    costupdater_ayarlar, 
+                    progress_callback=update_progress
+                )
+                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                output_text.after(0, lambda: open_folder_in_explorer(path))
+            except Exception as e:
+                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = threading.Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
+
     def output(path):
         output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
         window.unbind("<Configure>")
         window.bind("<Configure>", lambda e: resize(e, True))
-        costupdater_ayarlar = settings_text.get("1.0", tk.END)
-        costupdater_ayarlar = costupdater_ayarlar.rstrip("\n")
+        
+        costupdater_ayarlar = settings_text.get("1.0", tk.END).rstrip("\n")
         settings('Settings/costupdater_settings.txt', costupdater_ayarlar)
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            output_text.insert(END, "path degeri algilanamadi, lutfen dogru bir deger girdiginizden emin olup tekrar deneyiniz.\n")
-            output_text.see(END)
-        else:
-            costupdater_script_starter(path, output_text)
+        
+        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
+            text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
+            return
+            
+        csv_files = dosyalar_dictionary.get('costupdater', [])
+        if not csv_files:
+            text_print(output_text, "Hata: İşlenecek CSV dosyası sürüklemediniz.", color="red")
+            return
+            
+        input_file = csv_files[0]
+        
+        def update_progress(msg: str):
+            output_text.after(0, lambda: text_print(output_text, msg))
+
+        def run_in_thread():
+            try:
+                result = process_costupdater(
+                    input_file, 
+                    path, 
+                    costupdater_ayarlar, 
+                    progress_callback=update_progress
+                )
+                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                output_text.after(0, lambda: open_folder_in_explorer(path))
+            except Exception as e:
+                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = threading.Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
 
     window.bind("<Configure>", lambda e: resize(e, False))
 
