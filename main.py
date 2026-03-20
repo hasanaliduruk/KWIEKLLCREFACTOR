@@ -14,6 +14,7 @@ from gui.components.scrollbar import MyScrollbar
 from core.cost_updater import process_costupdater, process_costupdater2
 from core.invoice_processor import process_invoice
 from core.converter import process_conversion
+from core.order_creator import process_order_create
 
 import socket
 from threading import Thread
@@ -5068,207 +5069,6 @@ def button_invoicefinder(canvas2):
     window.bind('<Configure>', lambda e: invoicefinder_resize(e, 0))
     canvas2.bind_all('<MouseWheel>', on_mouse_wheel)
 
-
-def order_create_script(path, template, restock_excel, orderform_excel, output_text):
-    def settings_writer():
-        if 'shipment_settings.txt' not in os.listdir('Settings'):
-            with open('Settings/shipment_settings.txt', 'w', encoding='utf-8') as settings:
-                text_print(output_text, 'ayarlar dosyası oluşturuluyor...')
-                settings.write(ordercreate_settings_var)
-                settings.close()
-    def settings_reader():
-        text_print(output_text, 'ayarlar yükleniyor...')
-        sutunlar_dict = {
-            'restock_upc': [],
-            'restock_pcs': [],
-            'restock_suplier': [],
-            'restock_notes': [],
-            'orderform_upc': [],
-            'orderform_pcs': [],
-            'orderform_suplier': [],
-        }
-
-        with open('Settings/ordercreate_settings.txt', 'r', encoding='utf-8') as settings:
-            settings = settings.readlines()
-            #RESTOCK SETTINGS
-            for line in settings:
-                if '=====' in line:
-                    break
-                line = line.replace('\n', '')
-                line = line.split('=')
-                if line[0] == 'upc ' or line[0] == 'upc':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_upc'].append(deger)
-                elif line[0] == 'pcs ' or line[0] == 'pcs':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_pcs'].append(deger)
-                elif line[0] == 'suplier ' or line[0] == 'suplier':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_suplier'].append(deger)
-                elif line[0] == 'notes ' or line[0] == 'notes':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_notes'].append(deger)
-
-
-                #ORDER FORM SETTINGS
-            a = 0
-            for line in settings:
-                if '=====' in line:
-                    a+=1
-                if a == 1:
-                    line = line.replace('\n', '')
-                    line = line.split('=')
-                    if line[0] == 'upc ' or line[0] == 'upc':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_upc'].append(deger)
-                    elif line[0] == 'pcs ' or line[0] == 'pcs':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_pcs'].append(deger)
-                    elif line[0] == 'suplier ' or line[0] == 'suplier':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_suplier'].append(deger)
-
-        for key in sutunlar_dict.keys():
-            text_print(output_text, str(key) + ': ' + str(sutunlar_dict[key]))
-        text_print(output_text, 'Ayarlar başarıyla çekİldİ.'.upper())
-        return sutunlar_dict
-    def dir_creater():
-        try:
-            os.mkdir(f'{path}/ORDERS')
-        except FileExistsError:
-            pass
-
-    def restock_reader(restock_excel, sutunlar_dict):
-        text_print(output_text, 'Restock excel dosyasi okunuyor...')
-        df = pd.read_excel(restock_excel[0])
-        df = df.fillna(0)
-        try:
-            pcs_values = df[sutunlar_dict['restock_pcs'][0]].tolist()
-        except:
-            text_print(output_text, 'restock dosyasinda PCS sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        try:
-            upc_values = df[sutunlar_dict['restock_upc'][0]].tolist()
-        except:
-            text_print(output_text, 'restock dosyasinda UPC sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        try:
-            suplier_values = df[sutunlar_dict['restock_suplier'][0]].tolist()
-        except:
-            text_print(output_text, 'restock dosyasinda SUPLIER sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        try:
-            notes = df[sutunlar_dict['restock_notes'][0]].tolist()
-        except:
-            text_print(output_text, 'restock dosyasinda NOTES sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        output_dictionary = {}
-        for i, a in enumerate(upc_values):
-            if pcs_values[i] != 0:
-                try:
-                    output_dictionary[suplier_values[i]]
-                except:
-                    output_dictionary[suplier_values[i]] = {}
-                try:
-                    output_dictionary[suplier_values[i]][a]
-                except:
-                    output_dictionary[suplier_values[i]][a] = 0
-                output_dictionary[suplier_values[i]][a] = output_dictionary[suplier_values[i]][a] + pcs_values[i]
-                if notes[i] != 0:
-                    try:
-                        output_dictionary[notes[i]]
-                    except:
-                        output_dictionary[notes[i]] = {}
-                    try:
-                        output_dictionary[notes[i]][a]
-                    except:
-                        output_dictionary[notes[i]][a] = 0
-                    output_dictionary[notes[i]][a] = output_dictionary[notes[i]][a] + pcs_values[i]
-
-        return output_dictionary
-
-    def orderform_reader(orderform_excel, output_dictionary, sutunlar_dict):
-        text_print(output_text, 'Order Form excel dosyasi okunuyor...')
-        df = pd.read_excel(orderform_excel[0])
-        df = df.fillna(0)
-        try:
-            pcs_values = df[sutunlar_dict['orderform_pcs'][0]].tolist()
-        except:
-            text_print(output_text, 'orderform dosyasinda PCS sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        try:
-            upc_values = df[sutunlar_dict['orderform_upc'][0]].tolist()
-        except:
-            text_print(output_text, 'orderform dosyasinda UPC sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        try:
-            suplier_values = df[sutunlar_dict['orderform_suplier'][0]].tolist()
-        except:
-            text_print(output_text, 'orderform dosyasinda SUPLIER sutunu bulunamadi lutfen kontrol edip tekrar deneyiniz!', color='red')
-            return None
-        for i, a in enumerate(upc_values):
-            if pcs_values[i] != 0:
-                try:
-                    output_dictionary[suplier_values[i]]
-                except:
-                    output_dictionary[suplier_values[i]] = {}
-                try:
-                    output_dictionary[suplier_values[i]][a]
-                except:
-                    output_dictionary[suplier_values[i]][a] = 0
-                output_dictionary[suplier_values[i]][a] = output_dictionary[suplier_values[i]][a] + pcs_values[i]
-        return output_dictionary
-
-    def template_writer(output_dictionary):
-        start_row = 2
-        text_print(output_text, 'Bulunan değerler yazdırılıyor...')
-        for suplier in output_dictionary.keys():
-            wb = load_workbook(template)
-            ws = wb.active
-            for i, upc in enumerate(output_dictionary[suplier].keys()):
-                ws.cell(row=start_row + i, column=1, value=upc)
-                ws.cell(row=start_row + i, column=3, value=output_dictionary[suplier][upc])
-                ws[f'A{start_row+i}'].number_format = '000000000000'
-            output_path = f'{path}/ORDERS/{suplier.upper()}.xlsx'
-            wb.save(output_path)
-
-    def main():
-        try:
-            dir_creater()
-            settings_writer()
-            sutunlar_dict = settings_reader()
-            output_dictionary = restock_reader(restock_excel, sutunlar_dict)
-            if output_dictionary:
-                output_dictionary = orderform_reader(orderform_excel, output_dictionary, sutunlar_dict)
-                if output_dictionary:
-                    pass
-                else:
-                    return None
-            else:
-                return None
-            template_writer(output_dictionary)
-            open_folder_in_explorer(path)
-            text_print(output_text, 'İşlem başarıyla tamamlandı!', color='#90EE90')
-        except:
-            text_print(output_text, 'İşlem sırasında bir hata meydana geldi!')
-            text_print(output_text, traceback.format_exc())
-            text_print(output_text, "lütfen kontrol edip tekrar deneyiniz.", color='red')
-    main()
-
 def button_order_create(canvas2):
 
     #RESIZE
@@ -5519,23 +5319,46 @@ def button_order_create(canvas2):
     path_label.grid(column=0, row=2, pady=(20,0), padx=(25,0), sticky='w')
     path_frame.grid(column=0, row=3,pady=(0,20), padx=(25,5), sticky='we')
 
-    def order_create_script_starter(path, template, restock_excel, orderform_excel, output_text):
-        t = Thread(target=order_create_script, args=(path, template, restock_excel, orderform_excel, output_text), daemon=True)
-        t.start()
-
-
     def output(path, template, restock_excel, orderform_excel):
-        output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
-        ordercreate_ayarlar = order_create_settings.get("1.0", tk.END)
-        ordercreate_ayarlar = ordercreate_ayarlar.rstrip("\n")
-        settings("Settings/ordercreate_settings.txt", ordercreate_ayarlar)
+        output_text.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(), 0))
         window.unbind("<Configure>")
         window.bind("<Configure>", lambda e: resize(e, True))
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            output_text.insert(END, "path degeri algilanamadi, lutfen dogru bir deger girdiginizden emin olup tekrar deneyiniz.\n")
-            output_text.see(END)
-        else:
-            order_create_script_starter(path, template, restock_excel, orderform_excel, output_text)
+        
+        ordercreate_ayarlar = order_create_settings.get("1.0", tk.END).rstrip("\n")
+        settings("Settings/ordercreate_settings.txt", ordercreate_ayarlar)
+        
+        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
+            text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
+            return
+            
+        if not restock_excel:
+            text_print(output_text, "Hata: İşlenecek Restock excel dosyası sürüklemediniz.", color="red")
+            return
+            
+        if not orderform_excel:
+            text_print(output_text, "Hata: İşlenecek Order Form excel dosyası sürüklemediniz.", color="red")
+            return
+
+        def update_progress(msg: str):
+            output_text.after(0, lambda: text_print(output_text, msg))
+
+        def run_in_thread():
+            try:
+                result = process_order_create(
+                    restock_files=restock_excel,
+                    orderform_files=orderform_excel,
+                    template_path=template,
+                    output_folder=path,
+                    settings_content=ordercreate_ayarlar,
+                    progress_callback=update_progress
+                )
+                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                output_text.after(0, lambda: open_folder_in_explorer(result["output_path"]))
+            except Exception as e:
+                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
 
     canvas2.bind_all("<MouseWheel>", on_mouse_wheel)
     window.bind("<Configure>", lambda e: resize(e, False))
