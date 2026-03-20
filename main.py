@@ -12,6 +12,8 @@ from gui.components.custom_buttons import MyButton, SwitchButton
 from gui.components.option_menu import CustomOptionMenu
 from gui.components.scrollbar import MyScrollbar
 from core.cost_updater import process_costupdater, process_costupdater2
+from core.invoice_processor import process_invoice
+from core.converter import process_conversion
 
 import socket
 from threading import Thread
@@ -1051,83 +1053,6 @@ def tsv_script(path, output_text):
             text_print(output_text, 'bir hata meydana geldi...')
             e = traceback.format_exc()
             text_print(output_text, e, color='red')
-            sys.exit()
-    main()
-
-def converter_script(path: str, output_text: tk.Text, input_type: str, output_type: str):
-    class ConvertPdf:
-        def __init__(self, images, save_path, combine=False):
-            self.images = images
-            self.save_path = save_path
-            self.combine = combine
-        def converter(self, images, save_path, combine):
-            image_list = []
-            if combine:
-                for image in images:
-                    image_var = HASAN.open(image)
-                    rgb = image_var.convert('RGB')
-                    image_list.append(rgb)
-                image_list[0].save(save_path, save_all=True, append_images=image_list[1:])
-            else:
-                image_var = HASAN.open(images)
-                rgb = image_var.convert('RGB')
-                rgb.save(save_path)
-
-
-
-    objects = {
-        'csv': pd,
-        'xlsx': pd,
-        'txt': pd
-    }
-
-    read_functions = {
-        'csv': 'read_csv',
-        'xlsx': 'read_excel',
-        'txt': 'read_table'
-    }
-    write_functions = {
-        'csv': 'to_csv',
-        'xlsx': 'to_excel',
-        'txt': 'to_csv'
-    }
-
-    read_function = getattr(objects[input_type], read_functions[input_type])
-    def dir_creater():
-        try:
-            os.mkdir(path + '/sonuc dosyalari')
-        except FileExistsError:
-            pass
-    def noktavirgul(df):
-        df = df.map(lambda x: str(x).replace('.', ',') if isinstance(x, (str, float)) and x != 0 and x != 0.0 else x)
-        return df
-    def main():
-        try:
-            dir_creater()
-            for file in dosyalar_dictionary['convert']:
-                if file.endswith('.'+input_type):
-                    if input_type == 'txt':
-                        df = read_function(file, encoding="latin-1", dtype=str)
-                        df = df.fillna("")
-                    else:
-                        df = read_function(file, dtype=str)
-                        df = df.fillna("")
-                    if input_type == 'csv':
-                        df = noktavirgul(df)
-                    write_function = getattr(df, write_functions[output_type])
-                    save_name = file.split('/')
-                    save_name = save_name[-1]
-                    if output_type == 'txt':
-                        write_function(path + '/sonuc dosyalari/'+save_name.replace("."+input_type, '.'+output_type), sep='\t', index=False, na_rep='')
-                    else:
-                        write_function(path + '/sonuc dosyalari/'+save_name.replace("."+input_type, '.'+output_type), index=False, na_rep='')
-                    text_print(output_text, '{} dosyasi cevrildi'.format(save_name))
-            text_print(output_text, 'cevirme islemi tamamlandi!')
-            open_folder_in_explorer(path)
-            sys.exit()
-        except Exception:
-            text_print(output_text, 'bir hata meydana geldi. Hata kodu:')
-            text_print(output_text, traceback.format_exc(), color='red')
             sys.exit()
     main()
 
@@ -3150,211 +3075,6 @@ def shipmentCreater(canvas2):
     resize(1,0)
     window.bind("<Configure>", lambda e: resize(e,0))
 
-
-def invoice_script(path, output_text, delzero):
-    def settings_writer():
-        text_print(output_text, 'Creating settings file')
-        with open('Settings/invoice_settings.txt', 'w', encoding='utf-8') as file:
-            file.write('remove = Status, QuantityNotShipped, InvalidReason\n'
-                       'shipquantity = ShipQuantity\n'
-                       'date = InvoiceDate')
-            file.close()
-    def settings_reader():
-        text_print(output_text, 'Reading settings')
-        columns_dict={
-            'remove': [],
-            'shipquantity': [],
-            'date': []
-        }
-        with open('Settings/invoice_settings.txt', 'r', encoding='utf-8') as file:
-            lines = file.readlines()
-            for line in lines:
-                sp = line.split('=')
-                if sp[0] == 'remove' or sp[0] == 'remove ':
-                    sp[1] = sp[1].replace('\n', '')
-                    degerler = sp[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dict['remove'].append(deger)
-                if sp[0] == 'shipquantity' or sp[0] == 'shipquantity ':
-                    sp[1] = sp[1].replace('\n', '')
-                    degerler = sp[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dict['shipquantity'].append(deger)
-                if sp[0] == 'date' or sp[0] == 'date ':
-                    sp[1] = sp[1].replace('\n', '')
-                    degerler = sp[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        columns_dict['date'].append(deger)
-        text_print(output_text, str(columns_dict))
-        return columns_dict
-    def dir_creater():
-        try:
-            os.mkdir(path + '/invoice_sonuc_excel')
-        except FileExistsError:pass
-    def csv_reader(columns_dict):
-
-
-        # Dizin içindeki tüm CSV dosyalarının isimlerini al
-        csv_files = dosyalar_dictionary['invoice_csv']
-        dataframes = []
-        # Tüm CSV dosyalarını bir listeye oku
-        def column_checker(columns_dict, dosya):
-            def wait_for_enter():
-                window.bind("<Return>", on_enter)
-                window.wait_variable(wait_var)
-
-            def on_enter(event):
-                wait_var.set(1)
-
-            wait_var = tk.IntVar()
-            for key in columns_dict.keys():
-                columns = columns_dict[key]
-                boolenfirst = False
-                while True:
-                    df = pd.read_csv(file)
-                    for col in columns:
-                        try:
-                            ship_quantity_list = df[col].tolist()
-                            right_column = col
-                            break
-                        except:
-                            if col == columns[-1]:
-                                boolenfirst = True
-                                text_print(output_text, f'{dosya} icin {key} sutunu bulunamadi lutfen tekrar denemek icin ENTER\'a basiniz...')
-                                output_text.config(state=tk.NORMAL)
-                                wait_for_enter()
-                            continue
-                    if boolenfirst == True:
-                        boolenfirst = False
-                        continue
-                    break
-            return df
-        check_dict = {
-            'shipquantity': columns_dict['shipquantity'],
-            'date': columns_dict['date']
-        }
-        for file in csv_files:
-            df = column_checker(check_dict, file)
-            dataframes.append(df)
-
-
-        # Tüm DataFrame'leri birleştir
-        df_merged = pd.concat(dataframes, ignore_index=True)
-        # Birleştirilmiş DataFrame'i kontrol et
-        return df_merged
-
-        # Eğer istersen birleştirilmiş DataFrame'i yeni bir CSV dosyasına kaydedebilirsin
-        #df_merged.to_csv('birlesmis_dosya.csv', index=False)
-        #df.to_excel('invoice_sonuc_excel/'+ file, index=False)
-    def remove(df, columns):
-        df.drop(columns, axis=1, inplace=True, errors='ignore')
-        return df
-    def ship_quantity_remove(df,columns):
-        def wait_for_enter():
-            window.bind("<Return>", on_enter)
-            window.wait_variable(wait_var)
-
-        def on_enter(event):
-            wait_var.set(1)
-
-        wait_var = tk.IntVar()
-        boolenfirst= False
-        while True:
-            for col in columns:
-                try:
-                    ship_quantity_list = df[col].tolist()
-                    right_column = col
-                    break
-                except:
-                    if col == columns[-1]:
-                        boolenfirst = True
-                        text_print(output_text, 'ShipQuantity sutunu bulunamadi lutfen tekrar denemek icin ENTER\'a basiniz...')
-                        output_text.config(state=tk.NORMAL)
-                        wait_for_enter()
-                    continue
-            if boolenfirst == True:
-                boolenfirst = False
-                continue
-            break
-        if delzero != 0:
-            df = df[df[right_column] != 0]
-        return df
-    def date_converter(df,columns):
-        def wait_for_enter():
-            window.bind("<Return>", on_enter)
-            window.wait_variable(wait_var)
-
-        def on_enter(event):
-            wait_var.set(1)
-
-        wait_var = tk.IntVar()
-        boolenfirst= False
-        while True:
-            for col in columns:
-                try:
-                    date_list = df[col].tolist()
-                    right_column = col
-                    break
-                except:
-                    if col == columns[len(columns) - 1]:
-                        boolenfirst = True
-                        text_print(output_text, 'date sutunu bulunamadi lutfen tekrar denemek icin ENTER\'a basiniz...')
-                        output_text.config(state=tk.NORMAL)
-                        wait_for_enter()
-                    continue
-            if boolenfirst == True:
-                boolenfirst = False
-                continue
-            break
-        new_date_list = []
-        for date in date_list:
-            if '/' in date:
-                date = date.split('/')
-                tr_date = date[1]+'/'+date[0]+'/'+date[2]
-                new_date_list.append(tr_date)
-            elif ',' in date:
-                date = date.split(',')
-                tr_date = date[1]+'/'+date[0]+'/'+date[2]
-                new_date_list.append(tr_date)
-            elif '-' in date:
-                date = date.split('-')
-                tr_date = date[1]+'/'+date[0]+'/'+date[2]
-                new_date_list.append(tr_date)
-            else:
-                new_date_list.append('#HATA')
-
-        df[col] = new_date_list
-        return df
-    def noktavirgul(df):
-        df = df.map(lambda x: str(x).replace('.', ',') if isinstance(x, (str, float)) and x != 0 and x != 0.0 else x)
-        return df
-    def excel_writer(df, klasor):
-        df.to_excel(path + '/' + klasor +'/'+'toplu.xlsx', index=False)
-    def main():
-        try:
-            if 'invoice_settings.txt' not in os.listdir('Settings'):
-                settings_writer()
-            columns_dict = settings_reader()
-            dir_creater()
-            df = csv_reader(columns_dict)
-            df = remove(df, columns_dict['remove'])
-            df = ship_quantity_remove(df, columns_dict['shipquantity'])
-            df = date_converter(df, columns_dict['date'])
-            df = noktavirgul(df)
-            excel_writer(df, klasor='invoice_sonuc_excel')
-            text_print(output_text, 'islem basariyla tamamlandi...')
-            open_folder_in_explorer(path)
-            sys.exit()
-        except Exception:
-            text_print(output_text, 'bir hata meydana geldi')
-            text_print(output_text, traceback.format_exc(), color='red')
-            sys.exit()
-    main()
-
-
 def button_invoice(canvas2):
     def resize(e, a):
         scale = main_frame_resize()
@@ -3618,22 +3338,43 @@ def button_invoice(canvas2):
     settings_label.grid(column=0, row=2, sticky='w', pady=4)
     settings_text.grid(column=0, row=3, sticky='we')
     baslat_button.grid(column=0, row=4, sticky='e', pady=(20,0))
-    def invoice_script_starter(path, output_text, delzero):
-        t = Thread(target=invoice_script, args=(path, output_text, delzero), daemon=True)
-        t.start()
     def output(path):
-        output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
+        output_text.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(), 0))
         window.unbind("<Configure>")
         window.bind("<Configure>", lambda e: resize(e, True))
-        invoice_ayarlar = settings_text.get("1.0", tk.END)
-        invoice_ayarlar = invoice_ayarlar.rstrip("\n")
+        
+        invoice_ayarlar = settings_text.get("1.0", tk.END).rstrip("\n")
         settings('Settings/invoice_settings.txt', invoice_ayarlar)
         delzero = invoice_active_dictionary["0"]
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            output_text.insert(END, "path degeri algilanamadi, lutfen dogru bir deger girdiginizden emin olup tekrar deneyiniz.\n")
-            output_text.see(END)
-        else:
-            invoice_script_starter(path, output_text, delzero)
+        
+        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
+            text_print(output_text, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
+            return
+            
+        csv_files = dosyalar_dictionary.get('invoice_csv', [])
+        if not csv_files:
+            text_print(output_text, "Hata: İşlenecek CSV dosyası sürüklemediniz.", color="red")
+            return
+
+        def update_progress(msg: str):
+            output_text.after(0, lambda: text_print(output_text, msg))
+
+        def run_in_thread():
+            try:
+                result = process_invoice(
+                    csv_files, 
+                    path, 
+                    invoice_ayarlar, 
+                    delzero,
+                    progress_callback=update_progress
+                )
+                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                output_text.after(0, lambda: open_folder_in_explorer(os.path.dirname(result["output_path"])))
+            except Exception as e:
+                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
     window.bind("<Configure>", lambda e: resize(e, False))
 
 
@@ -3868,19 +3609,38 @@ def button_converter(canvas2):
     convert_button.grid(column=0, row=2, sticky='e', padx=0, pady=(15,0))
 
     def output(path, input_type, output_type):
-        convert_output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(),0))
+        convert_output_text.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(),0))
         window.unbind("<Configure>")
         window.bind("<Configure>", lambda e: resize_converter(e, True))
-        if path == 'Example: C:/Users/Username/Desktop/sonuc':
-            text_print(convert_output_text, 'yanlis path')
-        else:
-            def converter_script_starter(path, output_text, input_type, output_type):
-                t = Thread(target=converter_script, args=(path, output_text, input_type, output_type,), daemon=True)
-                t.start()
-            text_print(convert_output_text, path)
-            text_print(convert_output_text, input_type)
-            text_print(convert_output_text, output_type)
-            converter_script_starter(path, convert_output_text, input_type, output_type)
+        
+        if path == 'Example: C:/Users/Username/Desktop/sonuc' or path == "":
+            text_print(convert_output_text, "Hata: Geçerli bir kayıt yolu seçilmedi.", color="red")
+            return
+            
+        files_to_convert = dosyalar_dictionary.get('convert', [])
+        if not files_to_convert:
+            text_print(convert_output_text, "Hata: Dönüştürülecek dosya sürüklemediniz.", color="red")
+            return
+
+        def update_progress(msg: str):
+            convert_output_text.after(0, lambda: text_print(convert_output_text, msg))
+
+        def run_in_thread():
+            try:
+                result = process_conversion(
+                    files_to_convert, 
+                    path, 
+                    input_type, 
+                    output_type, 
+                    progress_callback=update_progress
+                )
+                convert_output_text.after(0, lambda: text_print(convert_output_text, result["message"], color='#90EE90'))
+                convert_output_text.after(0, lambda: open_folder_in_explorer(result["output_path"]))
+            except Exception as e:
+                convert_output_text.after(0, lambda: text_print(convert_output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
 
     window.bind("<Configure>", lambda e: resize_converter(e, False))
 
@@ -4371,12 +4131,6 @@ def button_costupdater(canvas2):
     settings_label.grid(column=0, row=2, sticky='w', pady=4)
     settings_text.grid(column=0, row=3, sticky='we')
     baslat_button.grid(column=0, row=4, sticky='e', pady=(20,0))
-    def costupdater2_script_starter(path, output_text):
-        t = Thread(target=costupdater2_script, args=(path, output_text), daemon=True)
-        t.start()
-    def costupdater_script_starter(path, output_text):
-        t = Thread(target=costupdater_script, args=(path, output_text), daemon=True)
-        t.start()
     def output2(path):
         output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
         window.unbind("<Configure>")
@@ -4412,7 +4166,7 @@ def button_costupdater(canvas2):
             except Exception as e:
                 output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
 
-        conversion_thread = threading.Thread(target=run_in_thread, daemon=True)
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
         conversion_thread.start()
 
     def output(path):
@@ -4450,7 +4204,7 @@ def button_costupdater(canvas2):
             except Exception as e:
                 output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
 
-        conversion_thread = threading.Thread(target=run_in_thread, daemon=True)
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
         conversion_thread.start()
 
     window.bind("<Configure>", lambda e: resize(e, False))
