@@ -2,9 +2,6 @@ import os
 import pandas as pd
 
 def validate_files(input_files, expected_extension):
-    """
-    Pre-Validation Katmanı: İşlem başlamadan önce verinin bütünlüğünü saniyeler içinde doğrular.
-    """
     if not input_files:
         raise ValueError("Hata: Dönüştürülecek dosya sağlanmadı.")
     for file in input_files:

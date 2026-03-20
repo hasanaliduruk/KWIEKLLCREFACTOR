@@ -15,6 +15,9 @@ from core.cost_updater import process_costupdater, process_costupdater2
 from core.invoice_processor import process_invoice
 from core.converter import process_conversion
 from core.order_creator import process_order_create
+from core.shipment_creator import process_shipment_creation
+from core.invoice_finder import process_invoice_finder, process_invoice_finder_upc
+from core.future_price_updater import process_future_price
 
 import socket
 from threading import Thread
@@ -1057,110 +1060,6 @@ def tsv_script(path, output_text):
             sys.exit()
     main()
 
-
-def future_price_script(path, name, restock_excel, future_excel, output_text):
-    def restock_reader():
-        restock_df = pd.read_excel(restock_excel)
-        restock_dictionary = {}
-        price_columns_list = []
-        all_asins = restock_df['ASIN'].tolist()
-
-        for i in restock_df.columns:
-            if 'price' in i:
-                price_columns_list.append(i)
-        for i, asin in enumerate(all_asins):
-            restock_dictionary[asin] = {}
-            restock_dictionary[asin]['Price'] = restock_df['Price'][i]
-            restock_dictionary[asin]['Maliyet'] = restock_df['Maliyet'][i]
-            for name in price_columns_list:
-                restock_dictionary[asin][name] = restock_df[name][i]
-        return [restock_dictionary, restock_df, price_columns_list]
-    def future_reader(restock_dictionary, restock_df: pd.DataFrame, restock_price_columns_list):
-        future_df = pd.read_excel(future_excel)
-        future_dictionary = {}
-        price_columns_list = []
-        future_name_list = []
-        all_asins = future_df['ASIN'].tolist()
-        for i in future_df.columns:
-            if 'price' in i:
-                price_columns_list.append(i)
-        for i, asin in enumerate(all_asins):
-            future_dictionary[asin] = {}
-            future_dictionary[asin]['Price'] = future_df['Price'][i]
-            future_dictionary[asin]['Maliyet'] = future_df['Maliyet'][i]
-            for name in price_columns_list:
-                future_dictionary[asin][name] = future_df[name][i]
-        for asin in restock_dictionary.keys():
-            if asin in future_dictionary.keys():
-                restock_dictionary[asin]['Future Price'] = future_dictionary[asin]['Price']
-                restock_dictionary[asin]['Future Maliyet'] = future_dictionary[asin]['Maliyet']
-                for name in price_columns_list:
-                    if name in restock_dictionary[asin].keys():
-                        future_name = name.replace('price', 'future price')
-                        restock_dictionary[asin][future_name] = future_dictionary[asin][name]
-                    else:
-                        future_name = name.replace('price', 'future price')
-                        restock_dictionary[asin][future_name] = future_dictionary[asin][name]
-            else:
-                restock_dictionary[asin]['Future Price'] = '#YOK'
-                restock_dictionary[asin]['Future Maliyet'] = '#YOK'
-                for name in price_columns_list:
-                    future_name = name.replace('price', 'future price')
-                    restock_dictionary[asin][future_name] = '#YOK'
-        future_price_list = []
-        future_maliyet_list = []
-        write_dict = {}
-        for name in price_columns_list:
-            future_name = name.replace('price', 'future price')
-            write_dict[future_name] = []
-        for i, asin in enumerate(restock_df['ASIN'].tolist()):
-            future_price_list.append(restock_dictionary[asin]['Future Price'])
-            future_maliyet_list.append(restock_dictionary[asin]['Future Maliyet'])
-            for name in price_columns_list:
-                future_name = name.replace('price', 'future price')
-                write_dict[future_name].append([i, restock_dictionary[asin][future_name]])
-
-        column_index = restock_df.columns.get_loc('Maliyet') + 1
-        restock_df.insert(column_index, 'Future Price', future_price_list, allow_duplicates = False)
-        restock_df.insert(column_index + 1, 'Future Maliyet', future_maliyet_list, allow_duplicates = False)
-        dont_exist_list = []
-        for future_name in write_dict.keys():
-            liste = []
-            for price in write_dict[future_name]:
-                liste.append(price[1])
-            name = future_name.replace('future price', 'price')
-            try:
-                column_index = restock_df.columns.get_loc(name) + 1
-                restock_df.insert(column_index, future_name, liste, allow_duplicates = False)
-            except:
-                dont_exist_list.append(future_name)
-        price_columns_indices = [restock_df.columns.get_loc(col) for col in restock_df.columns if 'price' in col]
-        max_index = max(price_columns_indices)
-        for name in dont_exist_list:
-            liste = []
-            for price in write_dict[name]:
-                liste.append(price[1])
-            max_index += 1
-            restock_df.insert(max_index, name, liste, allow_duplicates = False)
-        return restock_df
-    def writer(path, name, df:pd.DataFrame):
-        df.to_excel(f'{path}/{name}.xlsx', index=False)
-
-    def main():
-        text_print(output_text, 'restock dosyasi okunuyor')
-        restock_return = restock_reader()
-        restock_dictionary = restock_return[0]
-        restock_df = restock_return[1]
-        price_columns_list = restock_return[2]
-        text_print(output_text, 'future price dosyasi okunuyor ve gerekli islemler yapiliyor')
-        restock_df = future_reader(restock_dictionary, restock_df, price_columns_list)
-        text_print(output_text, 'sonuc dosyasi istenilen konuma yazdiriliyor')
-        writer(path, name, restock_df)
-        text_print(output_text, 'İşlem başarıyla tamamlandı!', color='green')
-        open_folder_in_explorer(path)
-
-    main()
-
 def future_price_window(future_price_button):
     canvas2.unbind_all("<MouseWheel>")
     def color_change(e,c,t, b):
@@ -1299,19 +1198,39 @@ def future_price_window(future_price_button):
         path = path.strip('\n')
         name = name.strip('\n')
         output(path, name)
-    def future_price_script_starter(path, name, future_restock, future_future, output_text):
-        t = Thread(target=future_price_script, args=(path, name, future_restock, future_future, output_text), daemon=True)
-        t.start()
     def output(path, name):
-        output_text.pack(side=BOTTOM, fill=X, anchor='w')
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            text_print(output_text, "Maalesef path degeri algilanamadi! Dogru bir deger girdiginizden emin olup tekrar deneyiniz.")
+        output_text.pack(side=tk.BOTTOM, fill=tk.X, anchor='w')
+        
+        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
+            text_print(output_text, "Hata: Dosya yolu algılanamadı! Doğru bir kayıt klasörü seçtiğinizden emin olun.", color="red")
+            return
+            
+        future_restock = dosyalar_dictionary.get('future_restock', [])
+        future_future = dosyalar_dictionary.get('future_future', [])
+        
+        if not future_restock or not future_future:
+            text_print(output_text, "Hata: Gerekli (Restock veya Future) Excel dosyalarından biri eksik. Lütfen dosyaları sürükleyin.", color="red")
+            return
+            
+        def update_progress(msg: str):
+            output_text.after(0, lambda: text_print(output_text, msg))
 
-        else:
-            if len(dosyalar_dictionary['future_restock']) == 0 or len(dosyalar_dictionary['future_future']) == 0:
-                text_print(output_text, 'Maalesef sağlanan dosyalar doğru bir şekilde algılanamadı, dosyaları istenilen şekilde sürükleyip bıraktığınızdan emin olunuz...')
-            else:
-                future_price_script_starter(path, name, dosyalar_dictionary['future_restock'][0], dosyalar_dictionary['future_future'][0], output_text)
+        def run_in_thread():
+            try:
+                result = process_future_price(
+                    path=path,
+                    name=name,
+                    restock_excel=future_restock[0],
+                    future_excel=future_future[0],
+                    progress_callback=update_progress
+                )
+                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                output_text.after(0, lambda: open_folder_in_explorer(result["output_path"]))
+            except Exception as e:
+                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
     browse_button.bind("<Button-1>", lambda e: browse_click(e,'#8AB4F8','black', save_path, browse_button))
     browse_button.bind("<ButtonRelease-1>", lambda e: browse_color_change(e,'#727478','white', browse_button))
     browse_button.bind("<Enter>", lambda e: browse_color_change(e,'#727478',canvas2_text_color, browse_button))
@@ -2170,631 +2089,6 @@ def button_expration(canvas2):
     canvas2.config(scrollregion=canvas2.bbox('all'))
     window.bind("<Configure>", lambda e: expration_resize(e, 0))
 
-
-def shipmentcreater_script(path, output_text, save_name, dc_code):
-
-    def settings():
-        if 'shipment_settings.txt' not in os.listdir('Settings'):
-            with open('Settings/shipment_settings.txt', 'w', encoding='utf-8') as settings:
-                text_print(output_text, 'ayarlar dosyası oluşturuluyor...')
-                settings.write('RESTOCK:\n'
-                               'upc = Upc\n'
-                               'pcs = PCS\n'
-                               'asin = ASIN\n'
-                               'pk = PK\n'
-                               'price = Price\n'
-                               'suplier = suplier\n'
-                               '=====================================================\n'
-                               'ORDER FORM:\n'
-                               'upc = UPC\n'
-                               'pcs = PCS\n'
-                               'asin = ASIN 1, ASIN 2, ASIN 3, ASIN 4\n'
-                               'SKU = ASIN1_SKU, ASIN2_SKU, ASIN3_SKU, ASIN4_SKU\n'
-                               'pk = PK\n'
-                               'price = price\n'
-                               'suplier = suplier\n'
-                               '=====================================================\n'
-                               'INVOICE:\n'
-                               'shipquantity = ShipQuantity\n'
-                               'upc = Upc\n'
-                               'price = NetEach2\n'
-                               'packsize = PackSize\n'
-                               'brand = Brand\n'
-                               'description = Description\n')
-                settings.close()
-    def getSettings():
-        text_print(output_text, 'ayarlar yükleniyor...')
-        sutunlar_dict = {
-            'restock_upc': [],
-            'restock_pcs': [],
-            'restock_asin': [],
-            'restock_pk': [],
-            'restock_price': [],
-            'restock_suplier': [],
-            'orderform_upc': [],
-            'orderform_pcs': [],
-            'orderform_asin': [],
-            'orderform_sku': [],
-            'orderform_pk': [],
-            'orderform_price': [],
-            'orderform_suplier': [],
-            'invoice_shipquantity': [],
-            'invoice_upc': [],
-            'invoice_price': [],
-            'invoice_packsize':[],
-            'invoice_brand':[],
-            'invoice_description':[]
-        }
-
-        with open('Settings/shipment_settings.txt', 'r', encoding='utf-8') as settings:
-            settings = settings.readlines()
-            #RESTOCK SETTINGS
-            for line in settings:
-                if '=====' in line:
-                    break
-                line = line.replace('\n', '')
-                line = line.split('=')
-                if line[0] == 'upc ' or line[0] == 'upc':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_upc'].append(deger)
-                elif line[0] == 'pcs ' or line[0] == 'pcs':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_pcs'].append(deger)
-                elif line[0] == 'asin ' or line[0] == 'asin':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_asin'].append(deger)
-                elif line[0] == 'pk ' or line[0] == 'pk':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_pk'].append(deger)
-                elif line[0] == 'price ' or line[0] == 'price':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_price'].append(deger)
-                elif line[0] == 'suplier ' or line[0] == 'suplier':
-                    degerler = line[1].split(',')
-                    for deger in degerler:
-                        deger = deger.replace(' ', '', 1)
-                        sutunlar_dict['restock_suplier'].append(deger)
-
-
-                #ORDER FORM SETTINGS
-            a = 0
-            for line in settings:
-                if '=====' in line:
-                    a+=1
-                if '=====' in line and a == 2:
-                    break
-                if a == 1:
-                    line = line.replace('\n', '')
-                    line = line.split('=')
-                    if line[0] == 'upc ' or line[0] == 'upc':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_upc'].append(deger)
-                    elif line[0] == 'pcs ' or line[0] == 'pcs':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_pcs'].append(deger)
-                    elif line[0] == 'asin ' or line[0] == 'asin':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_asin'].append(deger)
-                    elif line[0] == 'SKU ' or line[0] == 'SKU':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_sku'].append(deger)
-                    elif line[0] == 'pk ' or line[0] == 'pk':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_pk'].append(deger)
-                    elif line[0] == 'price ' or line[0] == 'price':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_price'].append(deger)
-                    elif line[0] == 'suplier ' or line[0] == 'suplier':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['orderform_suplier'].append(deger)
-
-
-            #INVOICE SETTINGS
-            a = 0
-            for line in settings:
-                if '=====' in line:
-                    a+=1
-                if a == 2:
-                    line = line.replace('\n', '')
-                    line = line.split('=')
-                    if line[0] == 'shipquantity ' or line[0] == 'shipquantity':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['invoice_shipquantity'].append(deger)
-                    elif line[0] == 'upc ' or line[0] == 'upc':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['invoice_upc'].append(deger)
-                    elif line[0] == 'price ' or line[0] == 'price':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['invoice_price'].append(deger)
-                    elif line[0] == 'packsize ' or line[0] == 'packsize':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['invoice_packsize'].append(deger)
-                    elif line[0] == 'brand ' or line[0] == 'brand':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['invoice_brand'].append(deger)
-                    elif line[0] == 'description ' or line[0] == 'description':
-                        degerler = line[1].split(',')
-                        for deger in degerler:
-                            deger = deger.replace(' ', '', 1)
-                            sutunlar_dict['invoice_description'].append(deger)
-        for key in sutunlar_dict.keys():
-            text_print(output_text, str(key) + ': ' + str(sutunlar_dict[key]))
-        text_print(output_text, 'Ayarlar başarıyla çekİldİ.'.upper())
-        return sutunlar_dict
-    def invoiceFormReader(sutunlar_dict):
-        files = dosyalar_dictionary['invoice']
-        invoice_form_dict = {}
-        for file in files:
-            if file.endswith('.xlsx'):
-                df = pd.read_excel(file)
-                invoice_form_dict['ShipQuantity'] = df[sutunlar_dict['invoice_shipquantity'][0]].tolist()
-                invoice_form_dict['Upc'] = df[sutunlar_dict['invoice_upc'][0]].tolist()
-                invoice_form_dict['Price'] = df[sutunlar_dict['invoice_price'][0]].tolist()
-                invoice_form_dict['PackSize'] = df[sutunlar_dict['invoice_packsize'][0]].tolist()
-                invoice_form_dict['Brand'] = df[sutunlar_dict['invoice_brand'][0]].tolist()
-                invoice_form_dict['Description'] = df[sutunlar_dict['invoice_description'][0]].tolist()
-        return invoice_form_dict
-    def orderFormReader(sutunlar_dict):
-        files = dosyalar_dictionary['order_form']
-        order_form_dict = {}
-        dictionary = {}
-        dictionary['UPC'] = []
-        dictionary['Price'] = []
-        dictionary['ShipQuantity'] = []
-        for file in files:
-            if file.endswith('.xlsx'):
-                df = pd.read_excel(file)
-                order_form_dict['Upc'] = df[sutunlar_dict['orderform_upc'][0]].tolist()
-                order_form_dict['Price'] = df[sutunlar_dict['orderform_price'][0]].tolist()
-                order_form_dict['Suplier'] = df[sutunlar_dict['orderform_suplier'][0]].tolist()
-                for i in range(1, len(sutunlar_dict['orderform_asin'])+1):
-                    if i != 1:
-                        order_form_dict['Pcs '+str(i)] = df[sutunlar_dict['orderform_pcs'][0]+'.'+str(i-1)].tolist()
-                    else:
-                        order_form_dict['Pcs '+str(i)] = df[sutunlar_dict['orderform_pcs'][0]].tolist()
-                    #dictionary['Asin ' + str(i)] = []
-                    #dictionary['Pcs ' + str(i)] = []
-                    #dictionary['ASIN' + str(i)+'_SKU'] = []
-                a = 1
-                for name in sutunlar_dict['orderform_asin']:
-                    order_form_dict['Asin '+ str(a)] = df[name].tolist()
-                    a += 1
-                a = 1
-                for name in sutunlar_dict['orderform_sku']:
-                    order_form_dict['ASIN'+str(a)+'_SKU'] = df[name].tolist()
-                    liste = []
-                    for i in order_form_dict['ASIN'+str(a)+'_SKU']:
-                        if type(i) == str and i.count('_') >= 3:
-                            print(i)
-                            i = i.split('_')
-
-                            i = i[2]
-                            liste.append(i)
-                        else:
-                            liste.append('#YOK')
-                    order_form_dict[f'PK {a}'] = liste
-                    a += 1
-
-        for key in order_form_dict.keys():
-            print(f"{key}: {order_form_dict[key]}")
-        liste = [order_form_dict, dictionary]
-        return liste
-    def restockFormReader(sutunlar_dict):
-        files = dosyalar_dictionary['restock']
-        restock_form_dict = {}
-        for file in files:
-            if file.endswith('.xlsx'):
-                df = pd.read_excel(file)
-                restock_form_dict['Asin'] = df[sutunlar_dict['restock_asin'][0]].tolist()
-                restock_form_dict['Upc'] = df[sutunlar_dict['restock_upc'][0]].tolist()
-                restock_form_dict['Pcs'] = df[sutunlar_dict['restock_pcs'][0]].tolist()
-                restock_form_dict['PK'] = df[sutunlar_dict['restock_pk'][0]].tolist()
-                restock_form_dict['Price'] = df[sutunlar_dict['restock_price'][0]].tolist()
-                restock_form_dict['Suplier'] = df[sutunlar_dict['restock_suplier'][0]].tolist()
-        return restock_form_dict
-    def indexFinder(item, liste):
-        a = 0
-        index_list = []
-        for z in liste:
-            if z == item:
-                index_list.append(a)
-            a += 1
-        return index_list
-    def match(invoice_form_dict, order_form_dict, restock_form_dict, dictionary):
-        liste = []
-        text_print(output_text, 'UPC değerleri eşleniyor...')
-        dictionary = {}
-        dictionary['UPC'] = []
-        dictionary['Price'] = []
-        dictionary['Price Check'] = []
-        dictionary['Suplier'] = []
-        dictionary['ShipQuantity'] = []
-        dictionary['Asin'] = []
-        dictionary['Pcs'] = []
-        dictionary['Yeni Pcs'] = []
-        dictionary['PK'] = []
-        dictionary['SKU'] = []
-        dictionary['PackSize'] = []
-        dictionary['Brand'] = []
-        dictionary['Description'] = []
-        dictionary['DOSYA'] = []
-        dictionary['SKU2'] = []
-        dictionary['PK EACH'] = []
-        dictionary['Kalan'] = []
-
-        for upc in invoice_form_dict['Upc']:
-            dc = dc_code
-            restock_kontrol = 0
-            order_kontrol = 0
-            if upc in restock_form_dict['Upc']:
-                restock_kontrol = 1
-                index_list = []
-                z = 0
-                for i in restock_form_dict['Upc']:
-                    if i == upc:
-                        index_list.append(z)
-                    z+=1
-                for index in index_list:
-                    index_invoice = invoice_form_dict['Upc'].index(upc)
-                    Price = invoice_form_dict['Price'][index_invoice]
-                    ShipQuantity = invoice_form_dict['ShipQuantity'][index_invoice]
-                    PackSize = invoice_form_dict['PackSize'][index_invoice]
-                    Brand = invoice_form_dict['Brand'][index_invoice]
-                    Description = invoice_form_dict['Description'][index_invoice]
-                    Price_check = restock_form_dict['Price'][index]
-                    Suplier = restock_form_dict['Suplier'][index]
-                    Asin = restock_form_dict['Asin'][index]
-                    Pcs = restock_form_dict['Pcs'][index]
-                    Pk = restock_form_dict['PK'][index]
-                    if Pk != '#YOK':
-                        Pkint = Pk.replace('PK', '')
-                        Pkint = int(Pkint)
-                    else:
-                        Pkint = '#YOK'
-                    Sku = '#YOK'
-                    excel = 'Restock'
-                    upcstr = str(upc)
-                    if len(upcstr) < 12:
-                        upcstr = upcstr.zfill(12)
-
-                    if False == math.isnan(Pcs):
-                        dictionary['UPC'].append(upc)
-                        dictionary['Price'].append(Price)
-                        dictionary['Price Check'].append(Price_check)
-                        dictionary['Suplier'].append(Suplier)
-                        dictionary['ShipQuantity'].append(ShipQuantity)
-                        dictionary['PackSize'].append(PackSize)
-                        dictionary['Brand'].append(Brand)
-                        dictionary['Description'].append(Description)
-                        dictionary['Asin'].append(Asin)
-                        dictionary['Pcs'].append(Pcs)
-                        dictionary['Yeni Pcs'].append(0)
-                        dictionary['PK'].append(Pk)
-                        dictionary['SKU'].append(Sku)
-                        dictionary['SKU2'].append(f"{dc}_{upcstr}_{Pk}_{format(Pkint * Price, '.2f')}")
-                        dictionary['PK EACH'].append(0)
-                        dictionary['Kalan'].append(0)
-                        #a = 2
-                        #while True:
-                        #try:
-                        #dictionary['Asin '+str(a)].append(' ')
-                        #dictionary['Pcs '+str(a)].append(' ')
-                        #dictionary['ASIN'+str(a)+'_SKU'].append(' ')
-                        #a+=1
-                        #except:
-                        #break
-                        dictionary['DOSYA'].append(excel)
-
-            if upc in order_form_dict['Upc']:
-                index_list = []
-                z = 0
-                for i in order_form_dict['Upc']:
-                    order_kontrol = 1
-                    if i == upc:
-                        index_list.append(z)
-                    z+=1
-                for index in index_list:
-                    index_invoice = invoice_form_dict['Upc'].index(upc)
-                    Price = invoice_form_dict['Price'][index_invoice]
-                    ShipQuantity = invoice_form_dict['ShipQuantity'][index_invoice]
-                    PackSize = invoice_form_dict['PackSize'][index_invoice]
-                    Brand = invoice_form_dict['Brand'][index_invoice]
-                    Description = invoice_form_dict['Description'][index_invoice]
-                    excel = 'Order Form'
-                    upcstr = str(upc)
-                    if len(upcstr) < 12:
-                        upcstr = upcstr.zfill(12)
-                    a = 1
-                    while True:
-                        try:
-                            Asin = order_form_dict['Asin '+str(a)][index]
-                            Pcs = order_form_dict['Pcs '+str(a)][index]
-                            Sku = order_form_dict['ASIN'+str(a)+'_SKU'][index]
-                            PK = order_form_dict[f'PK {a}'][index]
-                            Price_check = order_form_dict['Price'][index]
-                            Suplier = order_form_dict['Suplier'][index]
-                            if PK != '#YOK':
-                                Pkint = PK.replace('PK', '')
-                                Pkint = int(Pkint)
-                            else:
-                                Pkint = '#YOK'
-                            if type(Asin) == float and math.isnan(Asin) == False:
-                                dictionary['UPC'].append(upc)
-                                dictionary['Price'].append(Price)
-                                dictionary['Price Check'].append(Price_check)
-                                dictionary['Suplier'].append(Suplier)
-                                dictionary['ShipQuantity'].append(ShipQuantity)
-                                dictionary['PackSize'].append(PackSize)
-                                dictionary['Brand'].append(Brand)
-                                dictionary['Description'].append(Description)
-                                dictionary['Asin'].append(Asin)
-                                dictionary['Pcs'].append(Pcs)
-                                dictionary['Yeni Pcs'].append(0)
-                                dictionary['PK'].append(PK)
-                                dictionary['SKU'].append(Sku)
-                                dictionary['DOSYA'].append(excel)
-                                dictionary['SKU2'].append(f"{dc}_{upcstr}_{PK}_{format(Pkint * Price, '.2f')}")
-                                dictionary['PK EACH'].append(0)
-                                dictionary['Kalan'].append(0)
-                            if type(Asin) == str or type(Asin) == int:
-                                dictionary['UPC'].append(upc)
-                                dictionary['Price'].append(Price)
-                                dictionary['Price Check'].append(Price_check)
-                                dictionary['Suplier'].append(Suplier)
-                                dictionary['ShipQuantity'].append(ShipQuantity)
-                                dictionary['PackSize'].append(PackSize)
-                                dictionary['Brand'].append(Brand)
-                                dictionary['Description'].append(Description)
-                                dictionary['Asin'].append(Asin)
-                                dictionary['Pcs'].append(Pcs)
-                                dictionary['Yeni Pcs'].append(0)
-                                dictionary['PK'].append(PK)
-                                dictionary['SKU'].append(Sku)
-                                dictionary['DOSYA'].append(excel)
-                                dictionary['SKU2'].append(f"{dc}_{upcstr}_{PK}_{format(Pkint * Price, '.2f')}")
-                                dictionary['PK EACH'].append(0)
-                                dictionary['Kalan'].append(0)
-                            a+=1
-                        except:
-                            break
-            if (restock_kontrol == 1 or order_kontrol == 1 or (restock_kontrol == 1 or order_kontrol == 1)) and upc not in dictionary['UPC']:
-                index_invoice = invoice_form_dict['Upc'].index(upc)
-                Price = invoice_form_dict['Price'][index_invoice]
-                ShipQuantity = invoice_form_dict['ShipQuantity'][index_invoice]
-                PackSize = invoice_form_dict['PackSize'][index_invoice]
-                Brand = invoice_form_dict['Brand'][index_invoice]
-                Description = invoice_form_dict['Description'][index_invoice]
-                dictionary['Asin'].append('#YOK')
-                dictionary['Pcs'].append('#YOK')
-                dictionary['Yeni Pcs'].append(0)
-                dictionary['PK'].append('#YOK')
-                dictionary['SKU'].append('#YOK')
-                dictionary['UPC'].append(upc)
-                dictionary['Price'].append(Price)
-                dictionary['ShipQuantity'].append(ShipQuantity)
-                dictionary['PackSize'].append(PackSize)
-                dictionary['Brand'].append(Brand)
-                dictionary['Description'].append(Description)
-                dictionary['Price Check'].append('#YOK')
-                dictionary['Suplier'].append('#YOK')
-                dictionary['SKU2'].append('#YOK')
-                dictionary['PK EACH'].append('#YOK')
-                dictionary['Kalan'].append('#YOK')
-                if restock_kontrol == 1 and order_kontrol == 0:
-                    dictionary['DOSYA'].append('restock')
-                elif order_kontrol == 1 and restock_kontrol == 0:
-                    dictionary['DOSYA'].append('order')
-                elif restock_kontrol == 1 and order_kontrol == 1:
-                    dictionary['DOSYA'].append('BOTH')
-            if upc not in restock_form_dict['Upc'] and upc not in order_form_dict['Upc']:
-                index_invoice = invoice_form_dict['Upc'].index(upc)
-                Price = invoice_form_dict['Price'][index_invoice]
-                ShipQuantity = invoice_form_dict['ShipQuantity'][index_invoice]
-                PackSize = invoice_form_dict['PackSize'][index_invoice]
-                Brand = invoice_form_dict['Brand'][index_invoice]
-                Description = invoice_form_dict['Description'][index_invoice]
-                dictionary['Asin'].append('#YOK')
-                dictionary['Pcs'].append('#YOK')
-                dictionary['Yeni Pcs'].append(0)
-                dictionary['PK'].append('#YOK')
-                dictionary['SKU'].append('#YOK')
-                dictionary['UPC'].append(upc)
-                dictionary['Price'].append(Price)
-                dictionary['ShipQuantity'].append(ShipQuantity)
-                dictionary['PackSize'].append(PackSize)
-                dictionary['Brand'].append(Brand)
-                dictionary['Description'].append(Description)
-                dictionary['Price Check'].append('#YOK')
-                dictionary['Suplier'].append('#YOK')
-                dictionary['DOSYA'].append('#YOK')
-                dictionary['SKU2'].append('#YOK')
-                dictionary['PK EACH'].append('#YOK')
-                dictionary['Kalan'].append('#YOK')
-
-        letter_dictionary = {
-            0: "",
-            1: "_A",
-            2: "_B",
-            3: "_C",
-            4: "_D",
-            5: "_E",
-            6: "_F",
-            7: "_G",
-            8: "_H",
-            9: "_I",
-            10: "_J",
-            11: "_K",
-            12: "_L",
-            13: "_M",
-            14: "_N",
-            15: "_O",
-            16: "_P",
-            17: "_Q",
-            18: "_R",
-            19: "_S",
-            20: "_T",
-            21: "_U",
-            22: "_V",
-            23: "_Y",
-            24: "_Z",
-            25: "_Y",
-            26: "_Z",
-        }
-        index_list = []
-        for sku in dictionary['SKU2']:
-            indexes = indexFinder(sku, dictionary['SKU2'])
-            for i, index in enumerate(indexes):
-                if index not in index_list and dictionary['SKU2'][index] != '#YOK':
-                    dictionary['SKU2'][index] = dictionary['SKU2'][index]+letter_dictionary[i]
-                    index_list.append(index)
-
-        return dictionary
-    def stock_allocater(dictionary):
-        Upcler = dictionary['UPC']
-        complated_upc = []
-        for upc in Upcler:
-            if upc not in complated_upc:
-                complated_upc.append(upc)
-                index_list = indexFinder(upc, dictionary['UPC'])
-                pcs = 0
-                ShipQuantity = 0
-                oldpk=9999999
-                smallest = []
-                for index in index_list:
-                    ShipQuantity = dictionary['ShipQuantity'][index]
-                    if dictionary['Pcs'][index] != '#YOK' and math.isnan(dictionary['Pcs'][index]) != True:
-                        pcs = float(dictionary['Pcs'][index]) + pcs
-                    if dictionary['PK'][index] != '#YOK':
-                        nowpk = dictionary['PK'][0].replace('PK', '')
-                        nowpk = int(nowpk)
-                        if nowpk <= oldpk:
-                            oldpk = nowpk
-                            smallest = [nowpk, index]
-                for index in index_list:
-                    if dictionary['Pcs'][index] != '#YOK' and math.isnan(dictionary['Pcs'][index]) != True:
-                        pcs2 = dictionary['Pcs'][index]
-                        new_pcs = float(pcs2)/float(pcs)*float(ShipQuantity)
-                        new_pcs = round(new_pcs)
-                        pk = dictionary['PK'][index]
-                        if pk != '#YOK':
-                            pk = pk.replace('PK', '')
-                            pk = int(pk)
-                            kalan = new_pcs % pk
-                            if index != smallest[1]:
-                                new_pcs = new_pcs - kalan
-                                dictionary['Yeni Pcs'][index] = new_pcs
-                                dictionary['Yeni Pcs'][smallest[1]] = dictionary['Yeni Pcs'][smallest[1]] + kalan
-                            else:
-                                dictionary['Yeni Pcs'][smallest[1]] = dictionary['Yeni Pcs'][smallest[1]] + new_pcs
-                        else:
-                            dictionary['Yeni Pcs'][index] = new_pcs
-
-                for index in index_list:
-                    pk = dictionary['PK'][index]
-                    if pk != '#YOK':
-                        pk = pk.replace('PK', '')
-                        pk = int(pk)
-                        yenipcs = dictionary['Yeni Pcs'][index]
-                        pcseach = int(yenipcs/pk)
-                        kalan = yenipcs % pk
-                        dictionary['PK EACH'][index] = pcseach
-                        dictionary['Kalan'][index] = kalan
-
-        text_print(output_text, 'hazırlanmış excel dosyası kaydediliyor.')
-        for key in dictionary.keys():
-            print(f"{key}: {dictionary[key]}")
-        excel_dosya = pd.DataFrame(dictionary)
-        excel_dosya.to_excel(path+f'/{save_name}.xlsx', index=False)
-    def main():
-        try:
-            try:
-                settings()
-            except Exception:
-                text_print(output_text, 'settings.txt dosyası oluşturulurken bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            try:
-                sutunlar_dict = getSettings()
-            except Exception:
-                text_print(output_text, 'Ayarlar settings.txt dosyasından çekilirken bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            try:
-                liste = orderFormReader(sutunlar_dict)
-            except Exception:
-                text_print(output_text, 'Order Form dosyası okunurken bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            try:
-                invoice_form_dict = invoiceFormReader(sutunlar_dict)
-            except Exception:
-                text_print(output_text, 'Invoice dosyası okunurken bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            order_form_dict = liste[0]
-            try:
-                restock_form_dict = restockFormReader(sutunlar_dict)
-            except Exception:
-                text_print(output_text, 'Restock dosyası okunurken bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            dictionary = liste[1]
-            try:
-                dictionary = match(invoice_form_dict, order_form_dict, restock_form_dict, dictionary)
-            except Exception:
-                text_print(output_text, 'UPC eşleme işlemi sırasında bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            try:
-                stock_allocater(dictionary)
-            except Exception:
-                text_print(output_text, 'Yeni Pcs\'leri hesaplama işlemi sırasında bir hata meydana geldi.')
-                text_print(output_text, traceback.format_exc(), color='red')
-                sys.exit()
-            text_print(output_text, 'İşlem başarıyla tamamlandı!', color='green')
-            open_folder_in_explorer(path)
-            sys.exit()
-        except Exception:
-            text_print(output_text, 'Tanımlanamayan bir hata meydana geldi.')
-            text_print(output_text, traceback.format_exc(), color='red')
-            sys.exit()
-    main()
-
-
 def shipmentCreater(canvas2):
     #MOUSE SCROLL
     def on_mouse_wheel(event):
@@ -2996,30 +2290,51 @@ def shipmentCreater(canvas2):
 
 
     def output(path):
-        shipment_output.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
-        shipment_output_line.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0))
-        shipment_ayarlar = shipment_settings.get("1.0", tk.END)
-        shipment_ayarlar = shipment_ayarlar.rstrip("\n")
+        shipment_output.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(), 0))
+        shipment_output_line.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(), 0))
+        
+        shipment_ayarlar = shipment_settings.get("1.0", tk.END).rstrip("\n")
         settings("Settings/shipment_settings.txt", shipment_ayarlar)
-        save_name = save_name_text.get(1.0, tk.END).strip('\n')
+        save_name = save_name_text.get("1.0", tk.END).strip('\n')
         save_location_saver('shi', save_name_text)
-        dc_name = dc_name_text.get(1.0, tk.END)
-        dc_name = dc_name.strip('\n')
-        if path == "Example: C:/Users/Username/Desktop/sonuc":
-            text_print(shipment_output, 'Maalesef path degeri algilanamadi. Lutfen dogru bir dosya yolu belirttiginizden emin olup tekrar deneyiniz')
-        elif dc_name == "":
-            text_print(shipment_output, 'Maalesef dc kod degeri algilanamadi. Lutfen dogru bir kod belirttiginizden emin olup tekrar deneyiniz')
-        else:
-            text_print(shipment_output, path)
-            text_print(shipment_output, str(dosyalar_dictionary['order_form']))
-            text_print(shipment_output, str(dosyalar_dictionary['invoice']))
-            text_print(shipment_output, str(dosyalar_dictionary['restock']))
-            def shipmentcreater_script_starter(path, output_text, save_name, dc_name):
-                t = Thread(target=shipmentcreater_script, args=(path, output_text, save_name, dc_name), daemon=True)
-                t.start()
-            shipmentcreater_script_starter(path, shipment_output, save_name, dc_name)
+        dc_name = dc_name_text.get("1.0", tk.END).strip('\n')
+        
+        if path == "Example: C:/Users/Username/Desktop/sonuc" or path == "":
+            text_print(shipment_output, "Hata: Dosya yolu algılanamadı, lütfen geçerli bir klasör seçin.", color="red")
+            return
+        if dc_name == "":
+            text_print(shipment_output, "Hata: DC kod değeri algılanamadı.", color="red")
+            return
+
+        inv_files = dosyalar_dictionary.get('invoice', [])
+        ord_files = dosyalar_dictionary.get('order_form', [])
+        res_files = dosyalar_dictionary.get('restock', [])
+
+        def update_progress(msg: str):
+            shipment_output.after(0, lambda: text_print(shipment_output, msg))
+
+        def run_in_thread():
+            try:
+                result = process_shipment_creation(
+                    invoice_files=inv_files,
+                    order_form_files=ord_files,
+                    restock_files=res_files,
+                    output_folder=path,
+                    save_name=save_name,
+                    dc_code=dc_name,
+                    settings_content=shipment_ayarlar,
+                    progress_callback=update_progress
+                )
+                shipment_output.after(0, lambda: text_print(shipment_output, result["message"], color='#90EE90'))
+                shipment_output.after(0, lambda: open_folder_in_explorer(result["output_path"]))
+            except Exception as e:
+                shipment_output.after(0, lambda: text_print(shipment_output, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
+        
         window.unbind("<Configure>")
-        window.bind("<Configure>", lambda e: resize(e, 1))
+        window.bind("<Configure>", lambda e: resize(e, True))
     shipment_submit_button = MyButton(
         items_canvas,
         round=15,
@@ -4289,298 +3604,6 @@ def button_updater(canvas2):
     canvas2.update_idletasks()
     checkforupdates.grid(column=0, row=1, padx=(checkforupdates_label.winfo_width()-150,0), pady=(10,0), sticky='w')
 
-
-
-
-def invoicefinder_script(path, invoice_folder, user_input_date, output_text, allinvoices):
-    def indexFinder(item, liste):
-        index_list = []
-        for a, z in enumerate(liste):
-            if z == item:
-                index_list.append(a)
-        return index_list
-    def resource_excel_reader():
-        text_print(output_text, 'Sağlanan excel dosyası okunuyor...')
-        file_path = dosyalar_dictionary['invoice_finder'][0]
-        df = pd.read_excel(file_path, header=None)
-        temporary_lines = df.values.tolist()
-        lines = []
-        dictionary = {}
-        text_print(output_text, 'Dosyadan Sku ve Quantity değerleri ayrıştırılıyor...')
-        for line in temporary_lines:
-            lines.append(str(line[0]))
-        for i, line in enumerate(lines):
-            if line.count('_') >=3:
-                number_list = []
-                a = i+1
-                for item in lines[i:len(lines)]:
-                    if 'FNSKU' in item:
-                        number_list = [lines[a], lines[a+1]]
-                        break
-                    a+=1
-                dictionary[line] = number_list
-        upc_list = {}
-        return_dictionary = {}
-        excel_write_dictionary = {}
-        atlanan_asinler = []
-        for asin in dictionary.keys():
-            number_list = dictionary[asin]
-            number = '#YOK'
-            if '-' in number_list[1]:
-                number = number_list[0]
-            elif '+' in number_list[1]:
-                number = number_list[1].split('+')[0]
-
-            split_asin = asin.split('_')
-            upc = split_asin[1]
-            pk = split_asin[2]
-            pka = pk.replace('PK', '')
-            pka = int(pka)
-            deger = int(number) * pka
-            excel_write_dictionary[asin] = {
-                'upc': upc,
-                'pk': pk,
-                'amazonshipquantity': int(deger),
-                'invoice quantity': '',
-                'item number': '',
-                'invoice number': '',
-                'invoice each': '',
-                'invoice date': '',
-                'Yapildi/Yapilmadi': '',
-                'Fark': ''
-            }
-            if upc not in upc_list.keys():
-                upc_list[upc] = asin
-                return_dictionary[asin] = {
-                    'upc': float(upc),
-                    'pk': pk,
-                    'amazonshipquantity': int(deger)
-                }
-            else:
-                atlanan_asinler.append(asin)
-                asin = upc_list[upc]
-                return_dictionary[asin]['amazonshipquantity'] = int(return_dictionary[asin]['amazonshipquantity']) + deger
-
-        return [return_dictionary, excel_write_dictionary, atlanan_asinler, upc_list]
-    def allinvoices_excel_reader(source_dictionary, excel_dictionary, atlanan_asinler, upc_list):
-        text_print(output_text, 'ALL INVOICES excel dosyası okunuyor...')
-        df = pd.read_excel(allinvoices)
-        upcs = df['Upc'].tolist()
-        shipquantity = df['ShipQuantity'].tolist()
-        shipitem = df['ShipItem'].tolist()
-        invoice_number = df['InvoiceNumber'].tolist()
-        date = df['Date'].tolist()
-
-        user_date = pd.to_datetime(user_input_date, format='%d.%m.%Y')
-        invoices = os.listdir(invoice_folder)
-        def file_finder(a):
-            if temporary_dictionary:
-                max_date_key = max(temporary_dictionary, key=lambda x: temporary_dictionary[x]['date'])
-                invoice_number_tosearch = str(temporary_dictionary[max_date_key]['invoice_number'])
-                for file in invoices:
-                    if invoice_number_tosearch in file:
-                        shutil.copy2(f'{invoice_folder}/{file}', f'{path}/{file}')
-                        text_print(output_text, f'{file}: {upc}')
-                        dict_a['invoice'].append(invoice_number_tosearch)
-                b = int(temporary_dictionary[max_date_key]['shipquantity'])
-                a = b + a
-                dict_a['itemid'].append(temporary_dictionary[max_date_key]['shipitem'])
-                date_temp = temporary_dictionary[max_date_key]['date']
-                formatted_date = date_temp.strftime('%d-%m-%Y')
-                dict_a['date'].append(formatted_date)
-                temporary_dictionary.pop(max_date_key)
-                amazonshipquantity = int(source_dictionary[SKU]['amazonshipquantity'])
-                #text_print(output_text, f'amazonshipquantity: {amazonshipquantity}, toplam invoice: {a}, bu invoice: {b}')
-                dict_a['a'] = a
-                dict_a['b'].append(b)
-                if a < amazonshipquantity and temporary_dictionary.keys() != []:
-                    file_finder(a)
-        text_print(output_text, 'Her bir UPC için Invoice numarası bulunuyor ve pdf dosyalarında aratılıyor...')
-        for SKU in source_dictionary.keys():
-            upc = source_dictionary[SKU]['upc']
-            index_list = indexFinder(upc, upcs)
-            temporary_dictionary = {}
-            if index_list:
-                for index in index_list:
-                    if date[index] <= user_date:
-                        temporary_dictionary[index] = {
-                            'shipquantity': shipquantity[index],
-                            'shipitem': shipitem[index],
-                            'invoice_number': invoice_number[index],
-                            'date': date[index],
-                        }
-
-                a = 0
-                dict_a = {}
-                dict_a['invoice'] = []
-                dict_a['itemid'] = []
-                dict_a['date'] = []
-                dict_a['b'] = []
-                file_finder(a)
-
-                a = dict_a['a']
-                b_list = dict_a['b']
-                invoicelar = dict_a['invoice']
-                itemid = dict_a['itemid']
-                invoicedate = dict_a['date']
-
-
-                invoice_each_string = ''
-                for oge in b_list:
-                    if invoice_each_string == '':
-                        invoice_each_string = str(oge)
-                    else:
-                        invoice_each_string = invoice_each_string+ ', ' +str(oge)
-
-
-                invoice_date_string = ''
-                for date_temp in invoicedate:
-                    if invoice_date_string == '':
-                        invoice_date_string = date_temp
-                    else:
-                        invoice_date_string = invoice_date_string+ ', ' +date_temp
-
-
-                invoice_item_string = ''
-                for id in itemid:
-                    if invoice_item_string == '':
-                        invoice_item_string = str(int(id))
-                    else:
-                        invoice_item_string = invoice_item_string+ ', ' +str(int(id))
-
-
-                invoice_string = ''
-                for invoice in invoicelar:
-                    if invoice_string == '':
-                        invoice_string = invoice
-                    else:
-                        invoice_string = invoice_string+ ', ' +invoice
-                excel_dictionary[SKU]['invoice quantity'] = a
-                excel_dictionary[SKU]['invoice number'] = invoice_string
-                excel_dictionary[SKU]['item number'] = invoice_item_string
-                excel_dictionary[SKU]['invoice date'] = invoice_date_string
-                excel_dictionary[SKU]['Yapildi/Yapilmadi'] = 'Yapildi'
-                excel_dictionary[SKU]['invoice each'] = invoice_each_string
-                fark = int(excel_dictionary[SKU]['invoice quantity']) - int(excel_dictionary[SKU]['amazonshipquantity'])
-                if fark > 0:
-                    excel_dictionary[SKU]['Fark'] = f'+{fark}'
-                else:
-                    excel_dictionary[SKU]['Fark'] = fark
-            else:
-                excel_dictionary[SKU]['Yapildi/Yapilmadi'] = 'Yapilmadi'
-            if excel_dictionary[SKU]['invoice number'] == '':
-                excel_dictionary[SKU]['Yapildi/Yapilmadi'] = 'Yapilmadi'
-        for asin in atlanan_asinler:
-            gercek_asin = upc_list[excel_dictionary[asin]['upc']]
-            excel_dictionary[asin]['invoice each'] = excel_dictionary[gercek_asin]['invoice each']
-            excel_dictionary[asin]['item number'] = excel_dictionary[gercek_asin]['item number']
-            excel_dictionary[asin]['invoice number'] = excel_dictionary[gercek_asin]['invoice number']
-            excel_dictionary[asin]['invoice quantity'] = excel_dictionary[gercek_asin]['invoice quantity']
-            excel_dictionary[asin]['invoice date'] = excel_dictionary[gercek_asin]['invoice date']
-            excel_dictionary[asin]['Yapildi/Yapilmadi'] = excel_dictionary[gercek_asin]['Yapildi/Yapilmadi']
-            excel_dictionary[asin]['Fark'] = excel_dictionary[gercek_asin]['Fark']
-        text_print(output_text, 'Son excel dosyası oluşturuluyor ve yazdırılıyor...')
-        df = pd.DataFrame.from_dict(excel_dictionary, orient='index').reset_index()
-
-        # "index" sütununu "SKU" olarak yeniden adlandırma
-        df = df.rename(columns={'index': 'SKU'})
-        df.to_excel(f'{path}/sonexcel.xlsx', index=False)
-        text_print(output_text, 'excel dosyasi basariyla kaydedildi!')
-
-    def main():
-        try:
-            return_list = resource_excel_reader()
-            source_dictionary = return_list[0]
-            excel_write_dictionary = return_list[1]
-            atlanan_asinler = return_list[2]
-            upc_list = return_list[3]
-            try:
-                allinvoices_excel_reader(source_dictionary, excel_write_dictionary, atlanan_asinler, upc_list)
-                text_print(output_text, 'Operasyon Tamamlandı!')
-                open_folder_in_explorer(path)
-            except:
-                text_print(output_text, 'all invoice excelini okurken ve gerekli islemleri yaparken bir hata meydana geldi :/')
-                text_print(output_text, traceback.format_exc(), color='red')
-        except:
-            text_print(output_text, 'sağlanan kaynak dosyasını okurken bir hata meydana geldi :/')
-            text_print(output_text, traceback.format_exc(), color='red')
-    main()
-
-
-def invoicefinderupc_script(path, invoice_folder, user_input_upc, user_input_month, output_text, allinvoices):
-    def indexFinder(item, liste):
-        index_list = []
-        for a, z in enumerate(liste):
-            if z == item:
-                index_list.append(a)
-        return index_list
-    def allinvoices_excel_reader():
-        text_print(output_text, 'ALL INVOICES excel dosyası okunuyor...')
-        df = pd.read_excel(allinvoices)
-        upcs = df['Upc'].tolist()
-        invoice_number = df['InvoiceNumber'].tolist()
-        date = df['Date'].tolist()
-        now_date = pd.Timestamp.now()
-        int_month = int(user_input_month)
-        if int_month != 0:
-            before_fourteen_months = now_date - pd.DateOffset(months=int_month)
-            text_print(output_text, f'{int_month} ay öncesine kadar olan invoice numberlar bulunuyor ve dizinde aratılarak kaydediliyor...')
-        else:
-            text_print(output_text, f'tüm invoice numberlar bulunuyor ve dizinde aratılarak kaydediliyor...')
-
-
-        split_upc = user_input_upc.split(',')
-        if len(split_upc) == 1:
-            upc = split_upc[0]
-            upc = upc.replace(' ', '')
-            f_upc = float(upc)
-            print(f_upc)
-            indexes = indexFinder(f_upc, upcs)
-            for index in indexes:
-                if int_month != 0 :
-                    if date[index] > before_fourteen_months:
-                        print(invoice_number[index])
-                        for file in os.listdir(invoice_folder):
-                            if str(invoice_number[index]) in file:
-                                shutil.copy2(f"{invoice_folder}/{file}", f"{path}/{file}")
-                else:
-                    print(invoice_number[index])
-                    for file in os.listdir(invoice_folder):
-                        if str(invoice_number[index]) in file:
-                            shutil.copy2(f"{invoice_folder}/{file}", f"{path}/{file}")
-        else:
-            for upc in split_upc:
-                upc = upc.replace(' ', '')
-                f_upc = float(upc)
-                print(f_upc)
-                indexes = indexFinder(f_upc, upcs)
-                for index in indexes:
-                    if int_month != 0 :
-                        if date[index] > before_fourteen_months:
-                            print(invoice_number[index])
-                            for file in os.listdir(invoice_folder):
-                                if str(invoice_number[index]) in file:
-                                    try:
-                                        os.mkdir(f"{path}/{str(upc)}")
-                                    except FileExistsError:pass
-                                    shutil.copy2(f"{invoice_folder}/{file}", f"{path}/{str(upc)}/{file}")
-                    else:
-                        print(invoice_number[index])
-                        for file in os.listdir(invoice_folder):
-                            if str(invoice_number[index]) in file:
-                                try:
-                                    os.mkdir(f"{path}/{str(upc)}")
-                                except FileExistsError:pass
-                                shutil.copy2(f"{invoice_folder}/{file}", f"{path}/{str(upc)}/{file}")
-    def main():
-        try:
-            allinvoices_excel_reader()
-        except:
-            text_print(output_text, 'All invoice excel dosyasi okunurken veya pdf dosyalari bulunmaya calisirken bir hata meydana geldi!')
-            text_print(output_text, traceback.format_exc(), color='red')
-        text_print(output_text, 'işlem tamamlandı!')
-        open_folder_in_explorer(path)
-    main()
 def button_invoicefinder(canvas2):
     def invoicefinder_resize(e, a):
         scale = main_frame_resize()
@@ -5038,32 +4061,64 @@ def button_invoicefinder(canvas2):
     baslat_button.pack(side='right', padx=(10,0))
     yonerge_button.pack(side='right', padx=(10,0))
     canvas2.config(scrollregion=canvas2.bbox('all'))
-    def invoicefinder_script_starter(path, invoice_folder, date, output_text, allinvoices):
-        t = Thread(target=invoicefinder_script, args=(path, invoice_folder, date, output_text, allinvoices), daemon=True)
-        t.start()
-    def invoicefinderupc_script_starter(path, invoice_folder, upc, month, output_text, allinvoices):
-        t = Thread(target=invoicefinderupc_script, args=(path, invoice_folder, upc, month, output_text, allinvoices), daemon=True)
-        t.start()
     def output(path, invoice_folder, date, upc, month, allinvoices):
-        output_text.pack(side=BOTTOM, fill=X, padx=(canvas.winfo_width(), 0), anchor='w')
+        output_text.pack(side=tk.BOTTOM, fill=tk.X, padx=(canvas.winfo_width(), 0), anchor='w')
+        
         if path == placeholder or path == '':
-            text_print(output_text, 'Dosyalarin kaydedilecegi dosya yolu algilanamadi lutfen girdiginiz yolu kontrol edip tekrar deneyiniz.')
-        elif invoice_folder == placeholder or invoice_folder == '':
-            text_print(output_text, 'Invoice Pdf\'lerinin oldugu dosya yolu algilanamadi lutfen girdiginiz yolu kontrol edip tekrar deneyiniz.')
-        elif allinvoices == '' or allinvoices == placeholder:
-            text_print(output_text, 'ALL INVOICE excel dosyasinin oldugu dosya yolu algilanamadi lutfen girdiginiz yolu kontrol edip tekrar deneyiniz.')
-        if upc_switch.status == True:
-            if date == '' or date == date_placeholder:
-                text_print(output_text, 'Girdiginiz tarih degeri dogru gozukmuyor lutfen kontrol edip tekrar deneyiniz.')
-            else:
-                invoicefinder_script_starter(path, invoice_folder, date, output_text, allinvoices)
-        else:
-            if upc == '' or upc == upc_placeholder:
-                text_print(output_text, 'Girdiginiz upc degeri dogru gozukmuyor lutfen kontrol edip tekrar deneyiniz.')
-            elif month == '' or month == month_placeholder:
-                text_print(output_text, 'Girdiginiz Ay degeri dogru gozukmuyor lutfen kontrol edip tekrar deneyiniz.')
-            else:
-                invoicefinderupc_script_starter(path, invoice_folder, upc, month, output_text, allinvoices)
+            text_print(output_text, "Hata: Dosyaların kaydedileceği dosya yolu algılanamadı.", color='red')
+            return
+        if invoice_folder == placeholder or invoice_folder == '':
+            text_print(output_text, "Hata: Invoice PDF'lerinin olduğu klasör yolu algılanamadı.", color='red')
+            return
+        if allinvoices == '' or allinvoices == placeholder:
+            text_print(output_text, "Hata: ALL INVOICE excel dosyasının olduğu dosya yolu algılanamadı.", color='red')
+            return
+            
+        source_excel_list = dosyalar_dictionary.get('invoice_finder', [])
+        is_date_mode = upc_switch.status
+        
+        if is_date_mode and not source_excel_list:
+            text_print(output_text, "Hata: İşlenecek kaynak excel dosyasını sürüklemediniz.", color='red')
+            return
+
+        def update_progress(msg: str):
+            output_text.after(0, lambda: text_print(output_text, msg))
+
+        def run_in_thread():
+            try:
+                if is_date_mode:
+                    if date == '' or date == date_placeholder:
+                        raise ValueError("Lütfen geçerli bir tarih değeri giriniz (GG.AA.YYYY).")
+                    result = process_invoice_finder(
+                        source_excel=source_excel_list[0],
+                        all_invoices_excel=allinvoices,
+                        invoice_pdf_folder=invoice_folder,
+                        output_folder=path,
+                        user_input_date=date,
+                        progress_callback=update_progress
+                    )
+                else:
+                    if upc == '' or upc == upc_placeholder:
+                        raise ValueError("Lütfen geçerli bir UPC değeri giriniz.")
+                    if month == '' or month == month_placeholder:
+                        raise ValueError("Lütfen geçerli bir Ay değeri giriniz.")
+                    result = process_invoice_finder_upc(
+                        all_invoices_excel=allinvoices,
+                        invoice_pdf_folder=invoice_folder,
+                        output_folder=path,
+                        upcs_str=upc,
+                        months_str=month,
+                        progress_callback=update_progress
+                    )
+                    
+                output_text.after(0, lambda: text_print(output_text, result["message"], color='#90EE90'))
+                output_text.after(0, lambda: open_folder_in_explorer(result["output_path"]))
+            except Exception as e:
+                output_text.after(0, lambda: text_print(output_text, f"Hata: {str(e)}", color='red'))
+
+        conversion_thread = Thread(target=run_in_thread, daemon=True)
+        conversion_thread.start()
+        
         window.unbind("<Configure>")
         window.bind('<Configure>', lambda e: invoicefinder_resize(e, 1))
     window.bind('<Configure>', lambda e: invoicefinder_resize(e, 0))
