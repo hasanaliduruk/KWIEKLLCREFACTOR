@@ -40,7 +40,8 @@ jobs:
 
     - name: Build with PyInstaller (Windows)
       if: runner.os == 'Windows'
-      run: pyinstaller --noconfirm --onedir --windowed --add-data "assets;assets" main.py
+      shell: cmd
+      run: pyinstaller --noconfirm --onedir --windowed --add-data "assets;assets" --collect-all tkinterdnd2 main.py
 
     - name: Archive Build (Zip)
       uses: thedoctor0/zip-release@0.7.5
