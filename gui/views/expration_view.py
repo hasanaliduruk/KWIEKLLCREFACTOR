@@ -28,8 +28,8 @@ expration_settings_var = (
     "login_button_id = mainForm:j_idt23, mainForm:j_idt13\n"
     "email_id = mainForm:email\n"
     "password_id = mainForm:password\n"
-    "default_email = sales@buyable.net\n"
-    "default_password = hasali2603\n"
+    "default_email = your_email@example.com\n"
+    "default_password = your_password\n"
 )
 
 
