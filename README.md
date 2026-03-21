@@ -19,7 +19,7 @@ This project was developed to eliminate manual data entry errors, reduce operati
 Originally, the application was a monolithic script (`main.py`) exceeding **8,000 lines of code**. UI components, business logic, network requests, and multithreading processes were tightly coupled. This led to UI freezing, memory leaks, and high maintenance difficulty.
 
 **The After (Layered Architecture):**
-I successfully refactored the entire codebase into a modular, maintainable **Layered Architecture**. `main.py` is now a clean router (~350 lines), delegating responsibilities to isolated layers.
+I successfully refactored the entire codebase into a modular, maintainable **Layered Architecture**. `main.py` is now a clean router (~500 lines), delegating responsibilities to isolated layers.
 
 **Key Engineering Achievements:**
 - Eliminated Tkinter `Multiple Root` and `Cross-Thread GUI Update` fallacies by implementing thread-safe callbacks (`window.after`).
