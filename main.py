@@ -270,7 +270,7 @@ def button(canvas2, button):
 if __name__ == "__main__":
     freeze_support()
 
-    CURRENT_VERSION = "v1.2.2"
+    CURRENT_VERSION = "v1.2.4"
 
     OUTPUT_PATH = Path(__file__).resolve().parent
     ASSETS_PATH = OUTPUT_PATH / "assets" / "frame0"

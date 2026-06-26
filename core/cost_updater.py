@@ -79,33 +79,33 @@ def check_columns(df, liste, isim):
         f"Eksik Sütun Hatası: Yüklenen CSV dosyasında '{isim}' için beklenen sütunlardan hiçbiri bulunamadı. Beklenen sütun adları: {liste}. Lütfen dosyayı düzeltip tekrar başlatın."
     )
 
-
 def process_costupdater(
-    input_file: str, output_folder: str, settings_content: str, progress_callback=None
+        input_file: str, output_folder: str, settings_content: str, version: int, progress_callback=None
 ) -> dict:
     if not input_file or not os.path.exists(input_file):
         raise FileNotFoundError("Hata: İşlenecek CSV dosyası bulunamadı.")
 
-    columns_dictionary, maliyet_dictionary = parse_settings(settings_content, version=1)
+    # Ortak ayrıştırma
+    columns_dictionary, maliyet_dictionary = parse_settings(settings_content, version=version)
 
     if progress_callback:
         progress_callback("Dosya okunuyor...")
     df = pd.read_csv(input_file)
 
+    # Ortak Sütun Kontrolleri
     sku_col = check_columns(df, columns_dictionary["sku"], "sku")
     cost_col = check_columns(df, columns_dictionary["cost"], "cost")
-    additional_cost_col = check_columns(
-        df, columns_dictionary["additional cost"], "additional_cost"
-    )
-    bp_strategy_col = check_columns(
-        df, columns_dictionary["bp strategy"], "bp_strategy"
-    )
-    qd_strategy_col = check_columns(
-        df, columns_dictionary["qd strategy"], "qd_strategy"
-    )
-    business_pricing_col = check_columns(
-        df, columns_dictionary["business pricing"], "business_pricing"
-    )
+    additional_cost_col = check_columns(df, columns_dictionary["additional cost"], "additional_cost")
+    bp_strategy_col = check_columns(df, columns_dictionary["bp strategy"], "bp_strategy")
+    qd_strategy_col = check_columns(df, columns_dictionary["qd strategy"], "qd_strategy")
+    business_pricing_col = check_columns(df, columns_dictionary["business pricing"], "business_pricing")
+
+    # Sadece V2 için gereken sütunlar
+    if version == 2:
+        pkg_volume_col = check_columns(df, columns_dictionary["pkg volume"], "pkg_volume")
+        pkg_weight_col = check_columns(df, columns_dictionary["pkg weight"], "pkg_weight")
+        pkg_volume = df[pkg_volume_col].tolist()
+        pkg_weight = df[pkg_weight_col].tolist()
 
     sku = df[sku_col].tolist()
     cost = df[cost_col].tolist()
@@ -115,141 +115,62 @@ def process_costupdater(
     business_pricing = df[business_pricing_col].tolist()
 
     if progress_callback:
-        progress_callback("Veriler hesaplanıyor (V1)...")
+        progress_callback(f"Veriler hesaplanıyor (V{version})...")
 
-    for a, i in enumerate(sku):
-        split_liste = str(i).split("_")
-        dc = split_liste[0]
-        price = "#YOK"
-        for z in split_liste[1:]:
-            if "." in str(z) or "," in str(z):
-                z = str(z).replace(",", ".")
-                try:
-                    price = float(z)
-                except:
-                    price = "#YOK"
-        try:
-            maliyet = maliyet_dictionary[dc]
-        except:
-            if progress_callback:
-                progress_callback(
-                    f"Uyarı: '{i}' için ayarlar dosyasında additional cost değeri bulunamadı ('#YOK' yazdırılıyor)."
-                )
-            maliyet = "#YOK"
-
-        cost[a] = price
-        additional_cost[a] = maliyet
-        bp_strategy[a] = "AI"
-        qd_strategy[a] = "default"
-        business_pricing[a] = "on"
-
-    df[cost_col] = cost
-    df[additional_cost_col] = additional_cost
-    df[bp_strategy_col] = bp_strategy
-    df[qd_strategy_col] = qd_strategy
-    df[business_pricing_col] = business_pricing
-
-    os.makedirs(output_folder, exist_ok=True)
-    isim = os.path.basename(input_file)
-    output_path = os.path.join(output_folder, isim)
-
-    if progress_callback:
-        progress_callback("Sonuç dosyası kaydediliyor...")
-    df.to_csv(output_path, index=False)
-
-    return {
-        "status": "success",
-        "message": "İşlem başarıyla tamamlandı!",
-        "output_path": output_path,
-    }
-
-
-def process_costupdater2(
-    input_file: str, output_folder: str, settings_content: str, progress_callback=None
-) -> dict:
-    if not input_file or not os.path.exists(input_file):
-        raise FileNotFoundError("Hata: İşlenecek CSV dosyası bulunamadı.")
-
-    columns_dictionary, maliyet_dictionary = parse_settings(settings_content, version=2)
-
-    if progress_callback:
-        progress_callback("Dosya okunuyor...")
-    df = pd.read_csv(input_file)
-
-    sku_col = check_columns(df, columns_dictionary["sku"], "sku")
-    cost_col = check_columns(df, columns_dictionary["cost"], "cost")
-    additional_cost_col = check_columns(
-        df, columns_dictionary["additional cost"], "additional_cost"
-    )
-    bp_strategy_col = check_columns(
-        df, columns_dictionary["bp strategy"], "bp_strategy"
-    )
-    qd_strategy_col = check_columns(
-        df, columns_dictionary["qd strategy"], "qd_strategy"
-    )
-    business_pricing_col = check_columns(
-        df, columns_dictionary["business pricing"], "business_pricing"
-    )
-    pkg_volume_col = check_columns(df, columns_dictionary["pkg volume"], "pkg_volume")
-    pkg_weight_col = check_columns(df, columns_dictionary["pkg weight"], "pkg_weight")
-
-    sku = df[sku_col].tolist()
-    cost = df[cost_col].tolist()
-    additional_cost = df[additional_cost_col].tolist()
-    bp_strategy = df[bp_strategy_col].tolist()
-    qd_strategy = df[qd_strategy_col].tolist()
-    business_pricing = df[business_pricing_col].tolist()
-    pkg_volume = df[pkg_volume_col].tolist()
-    pkg_weight = df[pkg_weight_col].tolist()
-
-    if progress_callback:
-        progress_callback("Veriler hesaplanıyor (V2)...")
-
+    # Ana Döngü
     for a, i in enumerate(sku):
         split_liste = str(i).split("_")
         dc = split_liste[0]
         price = ""
+
         for z in split_liste[1:]:
             if "." in str(z) or "," in str(z):
                 z = str(z).replace(",", ".")
                 try:
                     price = float(z)
-                except:
+                except ValueError:
                     price = ""
-        try:
-            maliyet = maliyet_dictionary[dc]["additional cost"]
-            equation_indicator = maliyet_dictionary[dc]["equation"]
-            warehouse_fee = maliyet_dictionary[dc]["warehouse fee"]
-        except:
-            if progress_callback:
-                progress_callback(
-                    f"Uyarı: '{i}' için ayarlar dosyasında additional cost bulunamadı."
-                )
-            maliyet = 0
-            equation_indicator = 0
-            warehouse_fee = 0
 
-        try:
-            vol = float(pkg_volume[a])
-            weight = float(pkg_weight[a])
-            biggest = float(vol / 139) if float(vol / 139) > weight else weight
-        except:
-            biggest = 0
+        # VERSİYON BAZLI HESAPLAMA İZOLASYONU
+        if version == 1:
+            maliyet = maliyet_dictionary.get(dc, "#YOK")
+            if maliyet == "#YOK" and progress_callback:
+                progress_callback(f"Uyarı: '{i}' için ayarlar dosyasında additional cost değeri bulunamadı.")
 
-        if price != "":
-            cost[a] = (
-                float(price)
-                + float(equation(int(equation_indicator), biggest))
-                + float(warehouse_fee)
-            )
-        else:
-            cost[a] = price
+            cost[a] = price if price != "" else "#YOK"
+            additional_cost[a] = maliyet
 
-        additional_cost[a] = maliyet
+        elif version == 2:
+            try:
+                dc_data = maliyet_dictionary[dc]
+                maliyet = dc_data["additional cost"]
+                equation_indicator = dc_data["equation"]
+                warehouse_fee = dc_data["warehouse fee"]
+            except KeyError:
+                if progress_callback:
+                    progress_callback(f"Uyarı: '{i}' için ayarlar dosyasında eksik veri.")
+                maliyet, equation_indicator, warehouse_fee = 0, 0, 0
+
+            try:
+                vol = float(pkg_volume[a])
+                weight = float(pkg_weight[a])
+                biggest = max(float(vol / 139), weight)
+            except (ValueError, IndexError):
+                biggest = 0
+
+            if price != "":
+                cost[a] = float(price) + float(equation(int(equation_indicator), biggest)) + float(warehouse_fee)
+            else:
+                cost[a] = price
+
+            additional_cost[a] = maliyet
+
+        # Ortak atamalar
         bp_strategy[a] = "AI"
         qd_strategy[a] = "default"
         business_pricing[a] = "on"
 
+    # Ortak Kaydetme İşlemleri
     df[cost_col] = cost
     df[additional_cost_col] = additional_cost
     df[bp_strategy_col] = bp_strategy
@@ -257,8 +178,7 @@ def process_costupdater2(
     df[business_pricing_col] = business_pricing
 
     os.makedirs(output_folder, exist_ok=True)
-    isim = os.path.basename(input_file)
-    output_path = os.path.join(output_folder, isim)
+    output_path = os.path.join(output_folder, os.path.basename(input_file))
 
     if progress_callback:
         progress_callback("Sonuç dosyası kaydediliyor...")
@@ -266,6 +186,6 @@ def process_costupdater2(
 
     return {
         "status": "success",
-        "message": "V2 İşlemi başarıyla tamamlandı!",
+        "message": f"V{version} İşlemi başarıyla tamamlandı!",
         "output_path": output_path,
     }

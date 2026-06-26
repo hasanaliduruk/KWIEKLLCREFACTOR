@@ -239,6 +239,9 @@ def drag_drop(
                             e, bf, b, bt
                         ),
                     )
+                    button.bind('<Enter>', lambda e, bf=buttons_frame, b=button, bt=button_tik: ustunde(e, bf, b, bt))
+                    excel_image.bind('<Enter>',
+                                     lambda e, bf=buttons_frame, b=button, bt=button_tik: ustunde(e, bf, b, bt))
                     parent.update_idletasks()
                     inframe_width = drop_canvas.winfo_width()
                     buttons_frame.configure(width=button.winfo_width() + 30)
@@ -654,6 +657,10 @@ def ham_drag_drop2(
                             e, bf, b, bt, y, a
                         ),
                     )
+                    button.bind('<Enter>', lambda e, bf=buttons_frame, b=button, bt=button_tik, y=yukari_button,
+                                                  a=asagi_button: ustunde(e, bf, b, bt, y, a))
+                    excel_image.bind('<Enter>', lambda e, bf=buttons_frame, b=button, bt=button_tik, y=yukari_button,
+                                                       a=asagi_button: ustunde(e, bf, b, bt, y, a))
                     parent.update_idletasks()
                     inframe_width = drop_canvas.winfo_width()
                     buttons_frame.configure(width=button.winfo_width() + 30)

@@ -21,7 +21,7 @@ from utils.event_handlers import (
 )
 from gui.components.custom_buttons import MyButton, SwitchButton
 from gui.components.scrollbar import MyScrollbar
-from core.cost_updater import process_costupdater, process_costupdater2
+from core.cost_updater import process_costupdater
 from gui.components.drag_drop import drag_drop
 
 from tkinter import PhotoImage
@@ -477,10 +477,11 @@ def render_costupdater_view(
 
         def run_in_thread():
             try:
-                result = process_costupdater2(
+                result = process_costupdater(
                     input_file,
                     path,
                     costupdater_ayarlar,
+                    version=2,
                     progress_callback=update_progress,
                 )
                 output_text.after(
@@ -530,6 +531,7 @@ def render_costupdater_view(
                     input_file,
                     path,
                     costupdater_ayarlar,
+                    version=1,
                     progress_callback=update_progress,
                 )
                 output_text.after(

@@ -96,9 +96,9 @@ def process_future_price(
 
     dont_exist_list = []
     for future_name, vals in write_dict.items():
-        name = future_name.replace("future price", "price")
+        matching_price_col = future_name.replace("future price", "price")
         try:
-            col_idx = restock_df.columns.get_loc(name) + 1
+            col_idx = restock_df.columns.get_loc(matching_price_col) + 1
             restock_df.insert(col_idx, future_name, vals, allow_duplicates=False)
         except KeyError:
             dont_exist_list.append(future_name)
@@ -110,9 +110,11 @@ def process_future_price(
             if "price" in col.lower()
         ]
         max_index = max(price_indices) if price_indices else len(restock_df.columns) - 1
-        for name in dont_exist_list:
+        for missing_col_name in dont_exist_list:
             max_index += 1
-            restock_df.insert(max_index, name, write_dict[name], allow_duplicates=False)
+            restock_df.insert(
+                max_index, missing_col_name, write_dict[missing_col_name], allow_duplicates=False
+            )
 
     if progress_callback:
         progress_callback("Sonuç dosyası kaydediliyor...")
