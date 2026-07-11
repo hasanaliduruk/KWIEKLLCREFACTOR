@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <title>Operations Toolkit</title>
-<link rel="icon" type="image/x-icon" href="icon.ico">
+<link rel="icon" type="image/x-icon" id="app-favicon">
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
 <!-- Loading overlay — shown while Python imports core modules, hidden via JS -->
 <div id="loading-overlay">
   <div class="loading-inner">
-    <img class="loading-logo" src="icon.ico" alt="" width="48" height="48"/>
+    <img class="loading-logo" id="loading-logo-img" alt="" width="48" height="48"/>
     <div class="loading-title">Operations Toolkit</div>
     <div class="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
     <div class="loading-status" id="loading-status">Starting…</div>
@@ -24,7 +24,7 @@
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-mark">
-          <img class="brand-icon" src="icon.ico" alt="logo" width="24" height="24"/>
+          <img class="brand-icon" id="brand-icon-img" alt="logo" width="24" height="24"/>
       </div>
       <div>
         <div class="brand-title">Operations Toolkit</div>
@@ -84,6 +84,10 @@
     </div>
 
     <div class="nav-group-label">System</div>
+    <div class="nav-item" data-view="settings">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
     <div class="nav-item" data-view="updates">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
       <span>Updates</span>
@@ -749,6 +753,22 @@
         <div class="console-body" id="exp-log"></div>
       </div>
       <div class="result-banner" id="exp-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- SETTINGS VIEW                                                     -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-settings">
+      <div class="view-header">
+        <h1 class="view-title">Settings</h1>
+        <p class="view-desc">Edit the configuration files that control how each tool reads your data. Add new column names, new warehouse codes, or new rules — the format is flexible and fully under your control.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings files</div>
+        <p class="muted" style="margin:-4px 0 14px;">Each tool reads one of these text files. Edit them below, then click <strong>Save</strong>. You can always <strong>Reset</strong> a file to its original defaults.</p>
+        <div id="settings-cards"></div>
+      </div>
     </section>
 
     <!-- ---------------------------------------------------------------- -->

@@ -26,8 +26,8 @@ def process_conversion(
     validate_files(input_files, input_type)
 
     read_funcs = {
-        "csv": pd.read_csv,
-        "xlsx": pd.read_excel,
+        "csv": lambda f: pd.read_csv(f, dtype=str),
+        "xlsx": lambda f: pd.read_excel(f, dtype=str),
         "txt": lambda f: pd.read_table(f, encoding="latin-1", dtype=str),
     }
 
@@ -49,8 +49,6 @@ def process_conversion(
             )
 
         df = read_func(file)
-        if input_type != "txt":
-            df = df.astype(str)
         df = df.fillna("")
 
         if input_type == "csv":

@@ -6,3 +6,12 @@ Settings/
 *.xlsx
 *.csv
 .aider*
+
+# PyInstaller build artifacts
+dist/
+build_webview/
+build_tkinter/
+Output/
+*.exe
+*.spec.bak
+

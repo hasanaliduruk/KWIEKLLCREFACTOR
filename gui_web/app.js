@@ -19,6 +19,54 @@ function api() {
 }
 
 // ---------------------------------------------------------------------
+// Copy console output to clipboard
+// Every .console has a .console-head; we inject a "Copy" button into each
+// head that copies the text of that console's .console-body.
+// ---------------------------------------------------------------------
+function initConsoleCopyButtons() {
+  document.querySelectorAll(".console").forEach((consoleEl) => {
+    const head = consoleEl.querySelector(".console-head");
+    const body = consoleEl.querySelector(".console-body");
+    if (!head || !body || head.querySelector(".console-copy-btn")) return;
+
+    const btn = document.createElement("button");
+    btn.className = "console-copy-btn";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", async () => {
+      const text = body.innerText.trim();
+      if (!text) {
+        toast("Nothing to copy yet.");
+        return;
+      }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // Fallback for non-secure contexts (file://)
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        btn.textContent = "Copied!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "Copy";
+          btn.classList.remove("copied");
+        }, 1500);
+      } catch (e) {
+        toast("Copy failed.");
+      }
+    });
+    head.appendChild(btn);
+  });
+}
+
+// ---------------------------------------------------------------------
 // Toast helper
 // ---------------------------------------------------------------------
 function toast(msg) {
@@ -38,10 +86,12 @@ document.querySelectorAll(".nav-item[data-view]").forEach((item) => {
     document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
     item.classList.add("active");
     document.getElementById("view-" + item.dataset.view).classList.add("active");
+    // Reload settings when the user navigates to that view
+    if (item.dataset.view === "settings") settingsEditor.load();
   });
 });
 
-// ---------------------------------------------------------------------
+// ----------------------------------------------------------------
 // Browse-folder buttons (generic, works for any input via data-browse-folder)
 // ---------------------------------------------------------------------
 document.querySelectorAll("[data-browse-folder]").forEach((btn) => {
@@ -57,6 +107,8 @@ document.querySelectorAll("[data-browse-folder]").forEach((btn) => {
 
 // Restore remembered path values on load
 whenApiReady(async () => {
+  initConsoleCopyButtons();
+
   const mem = await api().get_memory();
   document.querySelectorAll("input[type=text]").forEach((input) => {
     if (mem[input.id] && !input.value) input.value = mem[input.id];
@@ -791,6 +843,188 @@ window.addEventListener("job-done", (e) => {
 });
 
 // =======================================================================
+// SETTINGS EDITOR
+// =======================================================================
+// Lets users edit the .txt settings files without hand-editing. The format
+// stays exactly as-is — this is a convenience layer, not a migration.
+// Users can add new column names, new DC codes, new warehouse rules, etc.
+
+const settingsEditor = {
+  container: null,
+  files: [],
+
+  init() {
+    this.container = document.getElementById("settings-cards");
+  },
+
+  async load() {
+    try {
+      this.files = await api().list_settings_files();
+    } catch (e) {
+      this.files = [];
+      toast("Could not load settings files.");
+    }
+    this.render();
+  },
+
+  render() {
+    if (!this.container) return;
+    this.container.innerHTML = "";
+    if (!this.files.length) {
+      this.container.innerHTML = '<p class="muted">No settings files found.</p>';
+      return;
+    }
+    for (const file of this.files) {
+      const card = this._buildCard(file);
+      this.container.appendChild(card);
+    }
+    this._attachListeners();
+  },
+
+  _buildCard(file) {
+    const card = document.createElement("div");
+    card.className = "settings-card";
+    card.dataset.filename = file.filename;
+
+    const desc = this._describeFile(file.filename);
+    const hints = this._validate(file.filename, file.content);
+
+    card.innerHTML = `
+      <div class="settings-card-head">
+        <span class="settings-card-title">
+          ${file.filename}
+          ${desc ? `<span class="settings-card-desc">${desc}</span>` : ""}
+        </span>
+        <span class="settings-card-toggle">&#9662;</span>
+      </div>
+      <div class="settings-card-body">
+        <textarea class="settings-box" data-filename="${file.filename}">${this._escapeHtml(file.content)}</textarea>
+        <div class="settings-card-hint" data-hints="${file.filename}">${hints}</div>
+        <div class="settings-card-actions">
+          <button class="btn" data-reset="${file.filename}">Reset to Default</button>
+          <button class="btn btn-primary" data-save="${file.filename}">Save</button>
+        </div>
+      </div>
+    `;
+    return card;
+  },
+
+  _describeFile(filename) {
+    const descriptions = {
+      "costupdater_settings.txt": "Cost Updater — V1 (flat additional cost)",
+      "costupdater2_settings.txt": "Cost Updater — V2 (volume/weight equation)",
+      "restock_settings.txt": "Restock — column mappings + per-warehouse deposit cost",
+      "invoice_settings.txt": "Invoice Processor — columns to drop, ship quantity, date",
+      "invoicefinder_yonergeler.txt": "Invoice Finder — instructions (not a config file)",
+      "ordercreate_settings.txt": "Order Creator — restock + order form column mappings",
+      "shipment_settings.txt": "Shipment Creator — restock, order form, invoice mappings",
+    };
+    return descriptions[filename] || "";
+  },
+
+  _validate(filename, content) {
+    // Skip the instructions file — it has no structure to validate
+    if (filename === "invoicefinder_yonergeler.txt") {
+      return '<span class="hint-ok">This is an instructions file — no validation needed.</span>';
+    }
+
+    const hints = [];
+    const hasSeparator = content.includes("=====");
+
+    if (!hasSeparator) {
+      hints.push('<span class="hint-warn">Missing separator line (=====) — column mappings should go above it, rules below it.</span>');
+    } else {
+      const lines = content.split("\n");
+      const sepIndex = lines.findIndex((l) => l.trim().startsWith("====="));
+      const mappings = lines.slice(0, sepIndex).filter((l) => l.includes("="));
+      const rules = lines.slice(sepIndex + 1).filter((l) => l.trim());
+      if (mappings.length === 0) {
+        hints.push('<span class="hint-warn">No column mappings found above the separator.</span>');
+      }
+      if (rules.length === 0) {
+        hints.push('<span class="hint-warn">No rules found below the separator.</span>');
+      }
+      if (mappings.length > 0 && rules.length > 0) {
+        hints.push(`<span class="hint-ok">${mappings.length} mapping(s), ${rules.length} rule(s).</span>`);
+      }
+    }
+
+    return hints.length ? hints.join("<br>") : '<span class="hint-ok">Looks good.</span>';
+  },
+
+  _escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  },
+
+  _attachListeners() {
+    if (!this.container) return;
+
+    // Collapse / expand on header click
+    this.container.querySelectorAll(".settings-card-head").forEach((head) => {
+      head.addEventListener("click", () => {
+        const card = head.closest(".settings-card");
+        if (card) card.classList.toggle("collapsed");
+      });
+    });
+
+    // Live validation on textarea input
+    this.container.querySelectorAll(".settings-box").forEach((ta) => {
+      ta.addEventListener("input", () => {
+        const filename = ta.dataset.filename;
+        const hintEl = this.container.querySelector(`[data-hints="${filename}"]`);
+        if (hintEl) hintEl.innerHTML = this._validate(filename, ta.value);
+      });
+    });
+
+    // Save buttons
+    this.container.querySelectorAll("[data-save]").forEach((btn) => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const filename = btn.dataset.save;
+        const ta = this.container.querySelector(`textarea[data-filename="${filename}"]`);
+        if (!ta) return;
+        btn.disabled = true;
+        btn.textContent = "Saving…";
+        try {
+          await api().save_settings(filename, ta.value);
+          toast(`${filename} saved.`);
+        } catch (e) {
+          toast(`Could not save ${filename}.`);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Save";
+        }
+      });
+    });
+
+    // Reset buttons
+    this.container.querySelectorAll("[data-reset]").forEach((btn) => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const filename = btn.dataset.reset;
+        if (!confirm(`Reset ${filename} to its original default? Your changes will be lost.`)) return;
+        btn.disabled = true;
+        try {
+          const ok = await api().reset_settings_to_default(filename);
+          if (ok) {
+            toast(`${filename} reset to default.`);
+            this.load();  // refresh all cards
+          } else {
+            toast(`No default available for ${filename}.`);
+          }
+        } catch (e) {
+          toast(`Could not reset ${filename}.`);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  },
+};
+
+// =======================================================================
 // UPDATES VIEW
 // =======================================================================
 
@@ -910,4 +1144,4 @@ window.addEventListener("update-badge", (e) => {
 });
 
 // Initialize once pywebview API is ready
-whenApiReady(() => updatesView.init());
+whenApiReady(() => { settingsEditor.init(); settingsEditor.load(); updatesView.init(); });

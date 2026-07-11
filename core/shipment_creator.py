@@ -244,6 +244,7 @@ def process_shipment_creation(
 
         if restock_kontrol:
             indices = indexFinder(upc, restock_form_dict["Upc"])
+            restock_appended = False
             for index in indices:
                 Pcs = restock_form_dict["Pcs"][index]
                 Pk = restock_form_dict["PK"][index]
@@ -271,9 +272,24 @@ def process_shipment_creation(
                     dictionary["PK EACH"].append(0)
                     dictionary["Kalan"].append(0)
                     dictionary["DOSYA"].append("Restock")
+                    restock_appended = True
+            # Orijinal davranış: eşleşen ama iç döngüde satır üretmeyen UPC
+            # için yine de bir #YOK satırı ekle (aksi halde satır atlanır).
+            if not restock_appended:
+                for k in dictionary.keys():
+                    dictionary[k].append("#YOK")
+                dictionary["UPC"][-1] = upc
+                dictionary["Price"][-1] = Price
+                dictionary["ShipQuantity"][-1] = ShipQuantity
+                dictionary["PackSize"][-1] = PackSize
+                dictionary["Brand"][-1] = Brand
+                dictionary["Description"][-1] = Description
+                dictionary["Yeni Pcs"][-1] = 0
+                dictionary["DOSYA"][-1] = "Restock"
 
         if order_kontrol:
             indices = indexFinder(upc, order_form_dict["Upc"])
+            order_appended = False
             for index in indices:
                 a = 1
                 while True:
@@ -313,9 +329,23 @@ def process_shipment_creation(
                             dictionary["PK EACH"].append(0)
                             dictionary["Kalan"].append(0)
                             dictionary["DOSYA"].append("Order Form")
+                            order_appended = True
                         a += 1
                     except KeyError:
                         break
+            # Orijinal davranış: eşleşen ama iç döngüde satır üretmeyen UPC
+            # için yine de bir #YOK satırı ekle.
+            if not order_appended:
+                for k in dictionary.keys():
+                    dictionary[k].append("#YOK")
+                dictionary["UPC"][-1] = upc
+                dictionary["Price"][-1] = Price
+                dictionary["ShipQuantity"][-1] = ShipQuantity
+                dictionary["PackSize"][-1] = PackSize
+                dictionary["Brand"][-1] = Brand
+                dictionary["Description"][-1] = Description
+                dictionary["Yeni Pcs"][-1] = 0
+                dictionary["DOSYA"][-1] = "Order Form"
 
         if not restock_kontrol and not order_kontrol:
             for k in dictionary.keys():

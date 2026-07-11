@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
 
@@ -132,13 +133,17 @@ def process_restock_logic(
     columns_dict, maliyet_dict = read_settings()
     dataframe_dictionary = {}
 
-    # 1. DOSYALARI OKUMA
-    for i, file in enumerate(row_files):
-        if progress_callback:
-            progress_callback(
-                f"Okunuyor ({i+1}/{len(row_files)}): {os.path.basename(file)}", 10
-            )
-        dataframe_dictionary[file] = pd.read_excel(file, engine="openpyxl")
+    # 1. DOSYALARI OKUMA (paralel - eski uygulamadaki ThreadPool davranışı)
+    def _read_row_file(file):
+        return file, pd.read_excel(file, engine="openpyxl")
+
+    with ThreadPoolExecutor() as pool:
+        for i, (file, df) in enumerate(pool.map(_read_row_file, row_files)):
+            if progress_callback:
+                progress_callback(
+                    f"Okunuyor ({i+1}/{len(row_files)}): {os.path.basename(file)}", 10
+                )
+            dataframe_dictionary[file] = df
 
     # 2. EXPORT
     if islem.get("export") == 1:
@@ -411,7 +416,7 @@ def process_restock_logic(
             a += 1
 
         main_excel_df.insert(lenght + a, "Qty on Hand", quantity_list, True)
-        a += 1
+        a = 5
 
         for file in yazilacak_dictionary.keys():
             filename = os.path.basename(file).split("-")[0]

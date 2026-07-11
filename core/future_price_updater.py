@@ -15,8 +15,8 @@ def process_future_price(
     restock_df = pd.read_excel(restock_excel)
     restock_dictionary = {}
 
-    # Tüm "price" içeren sütunları bulma
-    price_columns_list = [col for col in restock_df.columns if "price" in col.lower()]
+    # Tüm "price" içeren sütunları bulma (orijinal davranış: büyük/küçük harf duyarlı)
+    price_columns_list = [col for col in restock_df.columns if "price" in col]
     all_asins = restock_df["ASIN"].tolist()
 
     for i, asin in enumerate(all_asins):
@@ -35,7 +35,7 @@ def process_future_price(
         progress_callback("Future Price dosyası okunuyor ve veriler işleniyor...")
     future_df = pd.read_excel(future_excel)
     future_dictionary = {}
-    future_price_columns = [col for col in future_df.columns if "price" in col.lower()]
+    future_price_columns = [col for col in future_df.columns if "price" in col]
     future_asins = future_df["ASIN"].tolist()
 
     for i, asin in enumerate(future_asins):

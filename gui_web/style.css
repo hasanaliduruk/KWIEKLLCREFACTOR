@@ -536,6 +536,27 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   font-size: 11.5px;
   color: var(--text-faint);
 }
+.console-copy-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-faint);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.console-copy-btn:hover {
+  background: var(--accent);
+  color: #1a1206;
+  border-color: var(--accent);
+}
+.console-copy-btn.copied {
+  background: var(--ok);
+  color: #06210f;
+  border-color: var(--ok);
+}
 .console-dot {
   width: 7px;
   height: 7px;
@@ -830,3 +851,78 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
 .update-status-text.ok { color: var(--ok); }
 .update-status-text.warn { color: #e3c25e; }
 .update-status-text.error { color: var(--err); }
+
+/* ---------------------------------------------------------------------- */
+/* Settings editor                                                         */
+/* ---------------------------------------------------------------------- */
+
+.settings-card {
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.settings-card:last-child { margin-bottom: 0; }
+
+.settings-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  user-select: none;
+}
+.settings-card-head:hover { background: #1f2229; }
+
+.settings-card-title {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-card-title .settings-card-desc {
+  font-weight: 400;
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+.settings-card-toggle {
+  color: var(--text-faint);
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+.settings-card.collapsed .settings-card-toggle {
+  transform: rotate(-90deg);
+}
+
+.settings-card-body {
+  padding: 12px 14px;
+}
+.settings-card.collapsed .settings-card-body {
+  display: none;
+}
+
+.settings-card-body textarea.settings-box {
+  min-height: 100px;
+  margin: 0;
+}
+
+.settings-card-hint {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+.settings-card-hint .hint-warn { color: #e3c25e; }
+.settings-card-hint .hint-ok { color: var(--ok); }
+
+.settings-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}

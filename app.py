@@ -28,7 +28,7 @@ import keyring  # pip install keyring — stores the Expiration tool's password
 from core.converter import process_conversion
 from core.cost_updater import process_costupdater
 from core.restock_processor import process_restock_logic
-from core.tsv_converter import convert_tsv_to_excel
+from core.tsv_converter import convert_tsv_to_excel, compare_and_write
 from core.invoice_processor import process_invoice
 from core.order_creator import process_order_create
 from core.shipment_creator import process_shipment_creation
@@ -42,6 +42,16 @@ from core.expiration_processor import process_expiration
 
 CURRENT_VERSION = "v1.2.4"
 GITHUB_API_URL = "https://api.github.com/repos/hasali2603/KWIEKLLC/releases/latest"
+
+
+def get_asset_path(relative_name):
+    """Resolve an asset path that works both in dev and in PyInstaller _internal."""
+    if getattr(sys, "frozen", False):
+        base = sys._MEIPASS
+    else:
+        base = APP_DIR
+    return os.path.join(base, "assets", relative_name)
+
 
 # ---------------------------------------------------------------------------
 # Paths / settings bootstrap
@@ -287,12 +297,12 @@ class Api:
         """Open a native 'choose file(s)' dialog. file_types e.g. ['Excel Files (*.xlsx;*.xls)']."""
         types = tuple(file_types) if file_types else ()
         result = self._window.create_file_dialog(
-            webview.OPEN_DIALOG, allow_multiple=multiple, file_types=types
+            webview.FileDialog.OPEN, allow_multiple=multiple, file_types=types
         )
         return list(result) if result else []
 
     def pick_folder(self):
-        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        result = self._window.create_file_dialog(webview.FileDialog.OPEN)
         return result[0] if result else ""
 
     def open_folder(self, path):
@@ -319,6 +329,27 @@ class Api:
 
     def save_settings(self, filename, content):
         write_settings_file(filename, content)
+        return True
+
+    # -- Settings editor --------------------------------------------------------
+    # Lets the webview Settings view list and reset the .txt config files.
+    # The files themselves stay in the original format — no migration, no
+    # conversion. Users can add arbitrary column names, DC codes, etc.
+
+    def list_settings_files(self):
+        """Return a list of {filename, content} dicts for all .txt settings files."""
+        files = []
+        if os.path.isdir(SETTINGS_DIR):
+            for f in sorted(os.listdir(SETTINGS_DIR)):
+                if f.endswith(".txt"):
+                    files.append({"filename": f, "content": read_settings_file(f)})
+        return files
+
+    def reset_settings_to_default(self, filename):
+        """Reset a single settings file to the bundled default. Returns True on success."""
+        if filename not in DEFAULT_SETTINGS:
+            return False
+        write_settings_file(filename, DEFAULT_SETTINGS[filename])
         return True
 
     # -- progress reporting back to the page --------------------------------
@@ -438,12 +469,16 @@ class Api:
             try:
                 total = len(files)
                 last_path = output_folder
+                tsv_settings = os.path.join(SETTINGS_DIR, "tsv_settings.txt")
                 for i, f in enumerate(files, start=1):
                     self._emit("job-log", {"message": f"Converting ({i}/{total}): {os.path.basename(f)}"})
                     name = save_name if total == 1 else f"{save_name}_{i}"
-                    result = convert_tsv_to_excel(f, output_folder, name)
+                    result = convert_tsv_to_excel(f, output_folder, name, settings_path=tsv_settings)
                     last_path = result["output_path"]
-                self._emit("job-done", {"ok": True, "message": f"{total} file(s) converted.", "output_path": output_folder})
+                # Aggregate the converted files (original tsv_script behaviour)
+                self._emit("job-log", {"message": "Dosyalar birleştiriliyor (son.xlsx)..."})
+                son_path = compare_and_write(output_folder)
+                self._emit("job-done", {"ok": True, "message": f"{total} file(s) converted and aggregated.", "output_path": output_folder})
             except Exception as e:
                 self._emit("job-done", {"ok": False, "message": str(e)})
 
@@ -683,21 +718,18 @@ class Api:
             return False
 
     def prepare_and_run_batch(self, update_exe_path):
-        # The batch script: waits 2s, launches the updater EXE, polls
-        # tasklist until it finishes, then deletes both the updater and itself.
+        # The downloaded file is the Inno Setup installer (OperationsToolkit_Setup.exe).
+        # Running it silently (/SILENT) overwrites the existing install in-place
+        # (Inno matches the AppId and upgrades rather than double-installing).
+        # The batch waits for the app to exit, launches the installer, then
+        # deletes both the installer and itself.
         temp_dir = tempfile.gettempdir()
         batch_path = os.path.join(temp_dir, "run_update.bat")
         with open(batch_path, "w") as f:
             f.write(
                 f"@echo off\n"
                 f"timeout /t 2 > NUL\n"
-                f'start "" /b "{update_exe_path}"\n'
-                f":wait_loop\n"
-                f'tasklist /FI "IMAGENAME eq KWIEKLLC_update.exe" 2>NUL | find /I /N "KWIEKLLC_update.exe">NUL\n'
-                f'if "%ERRORLEVEL%"=="0" (\n'
-                f"    timeout /t 5 > NUL\n"
-                f"    goto wait_loop\n"
-                f")\n"
+                f'start "" /wait "{update_exe_path}" /SILENT /SUPPRESSMSGBOXES /NORESTART\n'
                 f'del /f /q "{update_exe_path}"\n'
                 f'del /f /q "%~f0" & exit\n'
             )
@@ -746,9 +778,9 @@ class Api:
         Thread(target=worker, daemon=True).start()
 
     def run_download_update(self, url):
-        """Download the update EXE and hand off to the self-replacing batch script."""
+        """Download the setup installer and hand off to the self-replacing batch script."""
         def worker():
-            temp_path = os.path.join(tempfile.gettempdir(), "KWIEKLLC_update.exe")
+            temp_path = os.path.join(tempfile.gettempdir(), "OperationsToolkit_Setup.exe")
             def progress(dl, total):
                 pct = round(dl / total * 100) if total > 0 else 0
                 self._emit("update-download-progress", {"percent": pct, "downloaded": dl, "total": total})
@@ -757,10 +789,10 @@ class Api:
             if not ok:
                 self._emit("update-download-progress", {"percent": 0, "error": "Download failed."})
                 return
-            self._emit("update-download-progress", {"percent": 100, "message": "Installing…"})
+            self._emit("update-download-progress", {"percent": 100, "message": "Installing update…"})
             self.prepare_and_run_batch(temp_path)
-            # Give the batch script a moment to launch the updater EXE,
-            # then exit the app so the updater can replace it.
+            # Give the batch script a moment to launch the installer,
+            # then exit the app so the installer can replace it.
             Thread(target=self._delayed_exit, daemon=True).start()
         Thread(target=worker, daemon=True).start()
 
@@ -769,11 +801,45 @@ class Api:
         os._exit(0)
 
 
+def _inject_icon_data_uri(window, icon_path):
+    """Replace the placeholder icon elements with a base64 data URI.
+
+    pywebview loads index.html via file://, which can't resolve relative
+    paths like ../assets/icon.ico. We read the icon file once, base64-encode
+    it, and inject it directly into the DOM so the favicon, loading overlay,
+    and sidebar logo all render without a local HTTP server.
+    """
+    try:
+        if not os.path.exists(icon_path):
+            return
+        import base64
+        with open(icon_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        data_uri = f"data:image/x-icon;base64,{b64}"
+        js = (
+            f"(function() {{"
+            f"  var uri = '{data_uri}';"
+            f"  var link = document.getElementById('app-favicon');"
+            f"  if (link) link.href = uri;"
+            f"  var img;"
+            f"  img = document.getElementById('loading-logo-img');"
+            f"  if (img) img.src = uri;"
+            f"  img = document.getElementById('brand-icon-img');"
+            f"  if (img) img.src = uri;"
+            f"}})();"
+        )
+        window.evaluate_js(js)
+    except Exception:
+        pass
+
+
 def main():
     ensure_default_settings()
 
     api = Api()
     index_path = os.path.join(APP_DIR, "gui_web", "index.html")
+
+    icon_path = get_asset_path("icon.ico")
 
     window = webview.create_window(
         "Operations Toolkit",
@@ -783,6 +849,7 @@ def main():
         height=860,
         min_size=(960, 640),
         background_color="#15171c",
+        #icon=icon_path,
     )
     api.set_window(window)
 
@@ -792,6 +859,11 @@ def main():
         # all of them. If new views with dropzones are added dynamically in
         # the future, call api.bind_dropzones() again after inserting them.
         api.bind_dropzones()
+
+        # Inject the app icon as a base64 data URI so the HTML <link> and
+        # <img> tags work without a server (file:// can't resolve ../assets/).
+        _inject_icon_data_uri(window, icon_path)
+
         # Silently check for updates in the background — if a newer release
         # exists on GitHub, a badge appears on the Updates nav item.
         api.run_silent_update_check()
