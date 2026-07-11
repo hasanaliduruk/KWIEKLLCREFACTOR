@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Operations Toolkit</title>
+<link rel="icon" type="image/x-icon" id="app-favicon">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Loading overlay — shown while Python imports core modules, hidden via JS -->
+<div id="loading-overlay">
+  <div class="loading-inner">
+    <img class="loading-logo" id="loading-logo-img" alt="" width="48" height="48"/>
+    <div class="loading-title">Operations Toolkit</div>
+    <div class="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+    <div class="loading-status" id="loading-status">Starting…</div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ============================== SIDEBAR ============================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+          <img class="brand-icon" id="brand-icon-img" alt="logo" width="24" height="24"/>
+      </div>
+      <div>
+        <div class="brand-title">Operations Toolkit</div>
+        <div class="brand-sub">v1.2.4 · desktop</div>
+      </div>
+    </div>
+    <div class="nav-group-label">Files</div>
+    <div class="nav-item active" data-view="converter">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h7l3 3v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><path d="M14 7v3h3"/></svg>
+      <span>Converter</span>
+    </div>
+    <div class="nav-item" data-view="tsv">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h7l3 3v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><path d="M14 7v3h3"/><path d="M9 14h6M9 17h4"/></svg>
+      <span>TSV Converter</span>
+    </div>
+
+    <div class="nav-group-label">Pricing</div>
+    <div class="nav-item" data-view="costupdater">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M7 7c0-1.5 2-2.5 5-2.5s5 1 5 2.5-2 2-5 2.5-5 1-5 2.5 2 2.5 5 2.5 5-1 5-2.5"/></svg>
+      <span>Cost Updater</span>
+    </div>
+
+    <div class="nav-group-label">Inventory</div>
+    <div class="nav-item" data-view="restock">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="1.5"/><path d="M3 11h18M8 7V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/></svg>
+      <span>Restock</span>
+    </div>
+    <div class="nav-item" data-view="futureprice">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 4 9-9"/><path d="M14 7h7v7"/></svg>
+      <span>Future Price</span>
+    </div>
+    <div class="nav-item" data-view="ordercreate">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11"/></svg>
+      <span>Order Creator</span>
+    </div>
+
+    <div class="nav-group-label">Invoices</div>
+    <div class="nav-item" data-view="invoice">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l3 3v15H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+      <span>Invoice Processor</span>
+    </div>
+    <div class="nav-item" data-view="invoicefinder">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/><path d="M8 11h6"/></svg>
+      <span>Invoice Finder</span>
+    </div>
+
+    <div class="nav-group-label">Shipping</div>
+    <div class="nav-item" data-view="shipment">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h11v9H3z"/><path d="M14 11h4l3 3v2h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>
+      <span>Shipment Creator</span>
+    </div>
+
+    <div class="nav-group-label">Compliance</div>
+    <div class="nav-item" data-view="expiration">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+      <span>Expiration</span>
+    </div>
+
+    <div class="nav-group-label">System</div>
+    <div class="nav-item" data-view="settings">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+    <div class="nav-item" data-view="updates">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+      <span>Updates</span>
+      <span class="update-badge" id="update-badge"></span>
+    </div>
+
+    <div class="sidebar-footer">All nine tools are wired up here.</div>
+  </aside>
+
+  <!-- ============================== MAIN ============================== -->
+  <main class="main">
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- CONVERTER VIEW                                                    -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view active" id="view-converter">
+      <div class="view-header">
+        <h1 class="view-title">Converter</h1>
+        <p class="view-desc">Batch-convert CSV, Excel, or TXT files into another format. Drop files below, pick a destination, and go.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Format</div>
+        <div class="input-row" style="align-items:center;">
+          <select class="select" id="conv-input-type" style="width:140px;">
+            <option value="csv" selected>csv</option>
+            <option value="xlsx">xlsx</option>
+            <option value="txt">txt</option>
+          </select>
+          <div class="convert-arrow">&#8594;</div>
+          <select class="select" id="conv-output-type" style="width:140px;">
+            <option value="xlsx" selected>xlsx</option>
+            <option value="txt">txt</option>
+            <option value="csv">csv</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Files to convert</div>
+        <div class="dropzone" id="conv-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop files here</strong> or click to browse</div>
+          <div class="dropzone-hint" id="conv-type-hint">.csv files</div>
+        </div>
+        <div class="file-list" id="conv-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Destination folder</div>
+        <div class="field">
+          <div class="input-row">
+            <input type="text" id="conv-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+            <button class="btn" data-browse-folder="conv-output-folder">Browse</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="conv-run-btn">Convert</button>
+      </div>
+
+      <div class="console" id="conv-console">
+        <div class="console-head"><span class="console-dot" id="conv-dot"></span><span id="conv-status-text">Idle</span></div>
+        <div class="progress-bar"><div class="progress-bar-fill" id="conv-progress-fill"></div></div>
+        <div class="console-body" id="conv-log"></div>
+      </div>
+      <div class="result-banner" id="conv-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- TSV CONVERTER VIEW                                                -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-tsv">
+      <div class="view-header">
+        <h1 class="view-title">TSV Converter</h1>
+        <p class="view-desc">Convert tab-separated text exports into formatted Excel workbooks.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Files to convert</div>
+        <div class="dropzone" id="tsv-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop .tsv / .txt files here</strong> or click to browse</div>
+          <div class="dropzone-hint">tab-separated files — multiple allowed</div>
+        </div>
+        <div class="file-list" id="tsv-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Output</div>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label">Result name</label>
+            <input type="text" id="tsv-save-name" placeholder="Converted_File" />
+            <p class="muted" style="margin-top:6px;">If you convert more than one file, a number is appended to each.</p>
+          </div>
+          <div class="field">
+            <label class="field-label">Destination folder</label>
+            <div class="input-row">
+              <input type="text" id="tsv-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+              <button class="btn" data-browse-folder="tsv-output-folder">Browse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="tsv-run-btn">Convert</button>
+      </div>
+
+      <div class="console" id="tsv-console">
+        <div class="console-head"><span class="console-dot" id="tsv-dot"></span><span id="tsv-status-text">Idle</span></div>
+        <div class="console-body" id="tsv-log"></div>
+      </div>
+      <div class="result-banner" id="tsv-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- COST UPDATER VIEW                                                 -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-costupdater">
+      <div class="view-header">
+        <h1 class="view-title">Cost Updater</h1>
+        <p class="view-desc">Recalculate cost &amp; pricing columns on a CSV export using your per-warehouse settings below.</p>
+      </div>
+
+      <div class="card">
+        <div class="switch-row">
+          <span class="switch-label">Use V2 calculation (package volume / weight based)</span>
+          <label class="switch">
+            <input type="checkbox" id="cu-version-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Input CSV</div>
+        <div class="dropzone" id="cu-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop a CSV here</strong> or click to browse</div>
+          <div class="dropzone-hint">.csv file</div>
+        </div>
+        <div class="file-list" id="cu-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings</div>
+        <p class="muted" style="margin:-4px 0 10px;">Column name mappings, then a line of <code>=====</code>, then per-warehouse cost rules. Saved automatically.</p>
+        <textarea class="settings-box" id="cu-settings"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Destination folder</div>
+        <div class="input-row">
+          <input type="text" id="cu-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+          <button class="btn" data-browse-folder="cu-output-folder">Browse</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="cu-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="cu-console">
+        <div class="console-head"><span class="console-dot" id="cu-dot"></span><span id="cu-status-text">Idle</span></div>
+        <div class="console-body" id="cu-log"></div>
+      </div>
+      <div class="result-banner" id="cu-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- RESTOCK VIEW                                                      -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-restock">
+      <div class="view-header">
+        <h1 class="view-title">Restock</h1>
+        <p class="view-desc">Combine raw supplier sheets, cross-check against export/on-hand data, and build the merged restock workbook.</p>
+      </div>
+
+      <div class="card">
+        <div class="switch-row">
+          <span class="switch-label">Export step (cross-check quantity on hand)</span>
+          <label class="switch">
+            <input type="checkbox" id="rs-export-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <div class="divider"></div>
+        <div class="switch-row">
+          <span class="switch-label">Restock step (merge into main workbook)</span>
+          <label class="switch">
+            <input type="checkbox" id="rs-restock-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Raw supplier files</div>
+        <div class="dropzone" id="rs-ham-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop raw Excel files here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls — multiple files</div>
+        </div>
+        <div class="file-list" id="rs-ham-file-list"></div>
+        <div class="priority-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span>When the same UPC appears in more than one file, the <strong>lower price always wins</strong>. The order below only breaks ties when two files have the exact same price for a UPC — whichever file is higher in the list keeps that row. Drag the handle or use the arrows to reorder.</span>
+        </div>
+      </div>
+
+      <div class="card" id="rs-export-card">
+        <div class="card-title">Export file (quantity on hand)</div>
+        <div class="dropzone" id="rs-export-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop export Excel files here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls — multiple files</div>
+        </div>
+        <div class="file-list" id="rs-export-file-list"></div>
+      </div>
+
+      <div class="card" id="rs-restock-card">
+        <div class="card-title">Main restock workbook</div>
+        <div class="dropzone" id="rs-restock-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the main workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="rs-restock-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings</div>
+        <p class="muted" style="margin:-4px 0 10px;">Possible column names, then a line of <code>=====</code>, then per-warehouse deposit cost. Saved automatically.</p>
+        <textarea class="settings-box" id="rs-settings"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Output</div>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label">Result name</label>
+            <input type="text" id="rs-save-name" placeholder="restock_2026_06" />
+          </div>
+          <div class="field">
+            <label class="field-label">Destination folder</label>
+            <div class="input-row">
+              <input type="text" id="rs-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+              <button class="btn" data-browse-folder="rs-output-folder">Browse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="rs-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="rs-console">
+        <div class="console-head"><span class="console-dot" id="rs-dot"></span><span id="rs-status-text">Idle</span></div>
+        <div class="progress-bar"><div class="progress-bar-fill" id="rs-progress-fill"></div></div>
+        <div class="console-body" id="rs-log"></div>
+      </div>
+      <div class="result-banner" id="rs-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- FUTURE PRICE VIEW                                                 -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-futureprice">
+      <div class="view-header">
+        <h1 class="view-title">Future Price</h1>
+        <p class="view-desc">Compare a restock workbook against an upcoming-price workbook and add "Future Price" / "Future Maliyet" columns next to every matching price column.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Restock file</div>
+        <div class="dropzone" id="fp-restock-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the restock workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls — needs an ASIN column</div>
+        </div>
+        <div class="file-list" id="fp-restock-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Future price file</div>
+        <div class="dropzone" id="fp-future-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the future price workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls — needs an ASIN column</div>
+        </div>
+        <div class="file-list" id="fp-future-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Output</div>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label">Result name</label>
+            <input type="text" id="fp-save-name" placeholder="Future_Price_Sonuc" />
+          </div>
+          <div class="field">
+            <label class="field-label">Destination folder</label>
+            <div class="input-row">
+              <input type="text" id="fp-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+              <button class="btn" data-browse-folder="fp-output-folder">Browse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="fp-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="fp-console">
+        <div class="console-head"><span class="console-dot" id="fp-dot"></span><span id="fp-status-text">Idle</span></div>
+        <div class="console-body" id="fp-log"></div>
+      </div>
+      <div class="result-banner" id="fp-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- ORDER CREATOR VIEW                                                -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-ordercreate">
+      <div class="view-header">
+        <h1 class="view-title">Order Creator</h1>
+        <p class="view-desc">Combine restock quantities and order form pricing into per-supplier order sheets, built from your template.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Restock file</div>
+        <div class="dropzone" id="oc-restock-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the restock workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="oc-restock-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Order form file</div>
+        <div class="dropzone" id="oc-orderform-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the order form workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="oc-orderform-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Template</div>
+        <p class="muted" style="margin:-2px 0 12px;">Every supplier's order sheet is built from <code>Settings/Template/Template.xlsx</code>. Edit that file directly to change the layout — it isn't picked here each run.</p>
+        <button class="btn" id="oc-template-btn">Open template folder</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings</div>
+        <p class="muted" style="margin:-4px 0 10px;">Column name mappings for the restock and order form files. Saved automatically.</p>
+        <textarea class="settings-box" id="oc-settings"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Destination folder</div>
+        <div class="input-row">
+          <input type="text" id="oc-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+          <button class="btn" data-browse-folder="oc-output-folder">Browse</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="oc-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="oc-console">
+        <div class="console-head"><span class="console-dot" id="oc-dot"></span><span id="oc-status-text">Idle</span></div>
+        <div class="console-body" id="oc-log"></div>
+      </div>
+      <div class="result-banner" id="oc-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- INVOICE PROCESSOR VIEW                                            -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-invoice">
+      <div class="view-header">
+        <h1 class="view-title">Invoice Processor</h1>
+        <p class="view-desc">Merge invoice CSV exports into one cleaned-up workbook — drops unwanted columns and normalizes dates.</p>
+      </div>
+
+      <div class="card">
+        <div class="switch-row">
+          <span class="switch-label">Drop rows where ship quantity is 0</span>
+          <label class="switch">
+            <input type="checkbox" id="inv-delzero-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Invoice CSVs</div>
+        <div class="dropzone" id="inv-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop CSV files here</strong> or click to browse</div>
+          <div class="dropzone-hint">.csv — multiple files</div>
+        </div>
+        <div class="file-list" id="inv-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings</div>
+        <p class="muted" style="margin:-4px 0 10px;">Columns to drop, plus which column holds ship quantity and which holds the date. Saved automatically.</p>
+        <textarea class="settings-box" id="inv-settings"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Destination folder</div>
+        <div class="input-row">
+          <input type="text" id="inv-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+          <button class="btn" data-browse-folder="inv-output-folder">Browse</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="inv-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="inv-console">
+        <div class="console-head"><span class="console-dot" id="inv-dot"></span><span id="inv-status-text">Idle</span></div>
+        <div class="console-body" id="inv-log"></div>
+      </div>
+      <div class="result-banner" id="inv-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- INVOICE FINDER VIEW                                               -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-invoicefinder">
+      <div class="view-header">
+        <h1 class="view-title">Invoice Finder</h1>
+        <p class="view-desc">Match Amazon shipment data or a UPC list against your invoice records, then copy the matching invoice PDFs into one folder.
+          <button class="link-btn" id="if-instructions-btn" style="margin-left:6px;">View full instructions</button>
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="switch-row">
+          <span class="switch-label" id="if-mode-label">Mode: search by date (using pasted Amazon data)</span>
+          <label class="switch">
+            <input type="checkbox" id="if-mode-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <p class="muted" style="margin-top:8px;">Switch off to search by a UPC list instead — no Amazon data file needed in that mode.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Result destination folder</div>
+        <p class="muted" style="margin:-4px 0 10px;">Matching invoice PDFs and the result Excel are saved here.</p>
+        <div class="input-row">
+          <input type="text" id="if-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+          <button class="btn" data-browse-folder="if-output-folder">Browse</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Invoice PDF folder</div>
+        <p class="muted" style="margin:-4px 0 10px;">The folder on your computer containing all your invoice PDF files.</p>
+        <div class="input-row">
+          <input type="text" id="if-invoice-folder" placeholder="C:/Users/you/Documents/Invoices" />
+          <button class="btn" data-browse-folder="if-invoice-folder">Browse</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">ALL INVOICES file</div>
+        <p class="muted" style="margin:-4px 0 10px;">The workbook containing every UPC and its matching invoice number.</p>
+        <div class="dropzone" id="if-allinvoices-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the ALL INVOICES workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="if-allinvoices-file-list"></div>
+      </div>
+
+      <!-- Date mode fields -->
+      <div class="card" id="if-date-mode-card">
+        <div class="card-title">Cutoff date</div>
+        <div class="field" style="max-width:220px;">
+          <label class="field-label">Only include invoices on or before</label>
+          <input type="text" id="if-date" placeholder="GG.AA.YYYY (e.g. 25.06.2026)" />
+        </div>
+        <div class="divider"></div>
+        <div class="card-title">Amazon shipment data</div>
+        <p class="muted" style="margin:-4px 0 10px;">Paste your copied Amazon shipment-plan text into an Excel file, then drop that file here.</p>
+        <div class="dropzone" id="if-source-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the source workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="if-source-file-list"></div>
+      </div>
+
+      <!-- UPC mode fields -->
+      <div class="card" id="if-upc-mode-card" style="display:none;">
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label">UPC value(s), comma-separated</label>
+            <input type="text" id="if-upcs" placeholder="074683008318, 012345678905" />
+          </div>
+          <div class="field">
+            <label class="field-label">Months back (0 = all time)</label>
+            <input type="text" id="if-months" placeholder="0" />
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="if-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="if-console">
+        <div class="console-head"><span class="console-dot" id="if-dot"></span><span id="if-status-text">Idle</span></div>
+        <div class="console-body" id="if-log"></div>
+      </div>
+      <div class="result-banner" id="if-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- SHIPMENT CREATOR VIEW                                             -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-shipment">
+      <div class="view-header">
+        <h1 class="view-title">Shipment Creator</h1>
+        <p class="view-desc">Match invoice quantities against order form and restock data, split units proportionally by pack size, and build the shipment workbook.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Invoice file</div>
+        <div class="dropzone" id="sc-invoice-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the invoice workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="sc-invoice-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Order form file</div>
+        <div class="dropzone" id="sc-orderform-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the order form workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="sc-orderform-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Restock file</div>
+        <div class="dropzone" id="sc-restock-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the restock workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.xlsx / .xls</div>
+        </div>
+        <div class="file-list" id="sc-restock-file-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings</div>
+        <p class="muted" style="margin:-4px 0 10px;">Column name mappings for the restock, order form, and invoice sections below. Saved automatically.</p>
+        <textarea class="settings-box" id="sc-settings"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Output</div>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label">DC code</label>
+            <input type="text" id="sc-dc-code" placeholder="IL" />
+            <p class="muted" style="margin-top:6px;">Used as the prefix in generated SKU values.</p>
+          </div>
+          <div class="field">
+            <label class="field-label">Result name</label>
+            <input type="text" id="sc-save-name" placeholder="shipment_2026_06" />
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label class="field-label">Destination folder</label>
+          <div class="input-row">
+            <input type="text" id="sc-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+            <button class="btn" data-browse-folder="sc-output-folder">Browse</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="sc-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="sc-console">
+        <div class="console-head"><span class="console-dot" id="sc-dot"></span><span id="sc-status-text">Idle</span></div>
+        <div class="console-body" id="sc-log"></div>
+      </div>
+      <div class="result-banner" id="sc-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- EXPIRATION VIEW                                                   -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-expiration">
+      <div class="view-header">
+        <h1 class="view-title">Expiration</h1>
+        <p class="view-desc">Logs into 2dworkflow.com and pulls expiration dates for each item in the shipment IDs you list below — one Excel per shipment plus a combined workbook.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2dworkflow.com login</div>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label">Username / email</label>
+            <input type="text" id="exp-username" placeholder="you@example.com" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="field-label">Password</label>
+            <input type="password" id="exp-password" placeholder="••••••••" autocomplete="off" />
+          </div>
+        </div>
+        <div class="switch-row" style="margin-top:14px;">
+          <span class="switch-label">Remember these credentials</span>
+          <label class="switch">
+            <input type="checkbox" id="exp-remember-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <p class="muted" style="margin-top:8px;">The password is stored in your operating system's credential manager</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Shipment IDs</div>
+        <p class="muted" style="margin:-4px 0 10px;">One or more shipment IDs, separated by commas.</p>
+        <textarea class="settings-box" id="exp-shipment-ids" style="min-height:60px;" placeholder="FBA15ABC123, FBA15XYZ789"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Destination folder</div>
+        <div class="input-row">
+          <input type="text" id="exp-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+          <button class="btn" data-browse-folder="exp-output-folder">Browse</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="exp-run-btn">Run</button>
+      </div>
+
+      <div class="console" id="exp-console">
+        <div class="console-head"><span class="console-dot" id="exp-dot"></span><span id="exp-status-text">Idle</span></div>
+        <div class="console-body" id="exp-log"></div>
+      </div>
+      <div class="result-banner" id="exp-result"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- SETTINGS VIEW                                                     -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-settings">
+      <div class="view-header">
+        <h1 class="view-title">Settings</h1>
+        <p class="view-desc">Edit the configuration files that control how each tool reads your data. Add new column names, new warehouse codes, or new rules — the format is flexible and fully under your control.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Settings files</div>
+        <p class="muted" style="margin:-4px 0 14px;">Each tool reads one of these text files. Edit them below, then click <strong>Save</strong>. You can always <strong>Reset</strong> a file to its original defaults.</p>
+        <div id="settings-cards"></div>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- UPDATES VIEW                                                      -->
+    <!-- ---------------------------------------------------------------- -->
+    <section class="view" id="view-updates">
+      <div class="view-header">
+        <h1 class="view-title">Updates</h1>
+        <p class="view-desc">Check for new versions and keep Operations Toolkit up to date.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Current version</div>
+        <div class="update-version" id="updates-current-version">v1.2.4</div>
+        <p class="muted" style="margin-top:6px;">Your installed version.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Check for updates</div>
+        <div class="update-status-text" id="updates-status">No check has been run yet.</div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn btn-primary" id="updates-check-btn">Check for Updates</button>
+          <button class="btn" id="updates-install-btn" style="display:none;">Install Update</button>
+          <button class="btn" id="updates-notes-btn" style="display:none;">Release Notes</button>
+        </div>
+        <div class="progress-bar" id="updates-progress" style="margin-top:12px;display:none;">
+          <div class="progress-bar-fill" id="updates-progress-fill"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="if-instructions-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span class="modal-title">Invoice Finder — Instructions</span>
+      <span class="modal-close" id="if-instructions-close">&times;</span>
+    </div>
+    <div class="modal-body" id="if-instructions-body">Loading…</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

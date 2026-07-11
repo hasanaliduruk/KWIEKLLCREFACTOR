@@ -15,8 +15,8 @@ def process_future_price(
     restock_df = pd.read_excel(restock_excel)
     restock_dictionary = {}
 
-    # Tüm "price" içeren sütunları bulma
-    price_columns_list = [col for col in restock_df.columns if "price" in col.lower()]
+    # Tüm "price" içeren sütunları bulma (orijinal davranış: büyük/küçük harf duyarlı)
+    price_columns_list = [col for col in restock_df.columns if "price" in col]
     all_asins = restock_df["ASIN"].tolist()
 
     for i, asin in enumerate(all_asins):
@@ -35,7 +35,7 @@ def process_future_price(
         progress_callback("Future Price dosyası okunuyor ve veriler işleniyor...")
     future_df = pd.read_excel(future_excel)
     future_dictionary = {}
-    future_price_columns = [col for col in future_df.columns if "price" in col.lower()]
+    future_price_columns = [col for col in future_df.columns if "price" in col]
     future_asins = future_df["ASIN"].tolist()
 
     for i, asin in enumerate(future_asins):
@@ -96,9 +96,9 @@ def process_future_price(
 
     dont_exist_list = []
     for future_name, vals in write_dict.items():
-        name = future_name.replace("future price", "price")
+        matching_price_col = future_name.replace("future price", "price")
         try:
-            col_idx = restock_df.columns.get_loc(name) + 1
+            col_idx = restock_df.columns.get_loc(matching_price_col) + 1
             restock_df.insert(col_idx, future_name, vals, allow_duplicates=False)
         except KeyError:
             dont_exist_list.append(future_name)
@@ -110,9 +110,11 @@ def process_future_price(
             if "price" in col.lower()
         ]
         max_index = max(price_indices) if price_indices else len(restock_df.columns) - 1
-        for name in dont_exist_list:
+        for missing_col_name in dont_exist_list:
             max_index += 1
-            restock_df.insert(max_index, name, write_dict[name], allow_duplicates=False)
+            restock_df.insert(
+                max_index, missing_col_name, write_dict[missing_col_name], allow_duplicates=False
+            )
 
     if progress_callback:
         progress_callback("Sonuç dosyası kaydediliyor...")

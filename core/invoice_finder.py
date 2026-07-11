@@ -60,7 +60,12 @@ def process_invoice_finder(
         if len(split_asin) < 3:
             continue
         upc, pk = split_asin[1], split_asin[2]
-        pka = int(pk.replace("PK", "")) if "PK" in pk else 1
+        # Orijinal davranış: 'PK' önekini çıkar; önek yoksa sayıyı olduğu gibi kullan.
+        # Dönüştürülemezse 1'e düş (eski kod int(pk) ile çöküyordu).
+        try:
+            pka = int(pk.replace("PK", "")) if "PK" in pk else int(pk)
+        except (ValueError, TypeError):
+            pka = 1
 
         deger = int(float(number)) * pka if number != "#YOK" else 0
 

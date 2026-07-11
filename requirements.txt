@@ -13,3 +13,6 @@ lxml==6.0.2
 pillow==12.1.0
 tkinterdnd2==0.4.3
 screeninfo==0.8.1
+
+pywebview>=5.0
+keyring>=24.0
