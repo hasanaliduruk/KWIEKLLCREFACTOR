@@ -1,47 +1,89 @@
 import csv
 import os
+import glob
+import pandas as pd
 import openpyxl
 from xlsxwriter import Workbook
+from typing import List, Callable
 
 
-def convert_tsv_to_excel(file_path: str, target_path: str, target_name: str) -> dict:
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Hata: Belirtilen dosya bulunamadı -> {file_path}")
+def _read_tsv_settings(settings_path: str):
+    """Read the `columns = ...` list from Settings/tsv_settings.txt.
 
-    if target_name == "" or target_name == " " or target_name is None:
-        target_name = "Converted_File"
-
-    if not target_name.endswith(".xlsx"):
-        target_name += ".xlsx"
-
-    os.makedirs(target_path, exist_ok=True)
-    full_target_path = os.path.join(target_path, target_name)
-
+    Falls back to the original default column list if the file is missing
+    or has no `columns=` line (same behaviour as the old tkinter app).
+    """
+    default_columns = [
+        "Merchant SKU", "Title", "ASIN", "FNSKU",
+        "external-id", "Condition", "Shipped",
+    ]
+    if not settings_path or not os.path.exists(settings_path):
+        return default_columns
     try:
-        workbook = Workbook(full_target_path)
-        worksheet = workbook.add_worksheet()
+        with open(settings_path, "r", encoding="utf-8") as f:
+            for line in f.readlines():
+                if line.lower().startswith("columns"):
+                    _, val = line.split("=", 1)
+                    cols = [c.strip() for c in val.split(",") if c.strip()]
+                    return cols or default_columns
+    except Exception:
+        pass
+    return default_columns
 
+
+def process_tsvs_and_aggregate(files: List[str], target_path: str, settings_path: str = None, emit_callback: Callable = None) -> str:
+    """
+    Reads a provided list of TSV files directly into memory, aggregates 'Shipped' quantities,
+    emits progress, and writes only the final son.xlsx file.
+    """
+    if not files:
+        raise ValueError("Hata: İşlenecek dosya listesi boş.")
+
+    columns_to_look_for = _read_tsv_settings(settings_path) # Assumes _read_tsv_settings is defined as before
+    aggregated = {}
+    total_files = len(files)
+
+    for i, file_path in enumerate(files, start=1):
+        if emit_callback:
+            emit_callback("job-log", {"message": f"Processing in-memory ({i}/{total_files}): {os.path.basename(file_path)}"})
+            
         with open(file_path, "rt", encoding="utf8") as f:
             reader = csv.reader(f, delimiter="\t")
-            for r, row in enumerate(reader):
-                for c, col in enumerate(row):
-                    worksheet.write(r, c, col)
-        workbook.close()
+            header = None
+            sku_idx = -1
+            shipped_idx = -1
 
-        wb = openpyxl.load_workbook(full_target_path)
-        sheet = wb.active
-        for column_cells in sheet.columns:
-            length = max(len(str(cell.value) or "") for cell in column_cells)
-            sheet.column_dimensions[
-                openpyxl.utils.get_column_letter(column_cells[0].column)
-            ].width = (length + 3)
-        wb.save(full_target_path)
+            for row in reader:
+                if header is None:
+                    if any(col in row for col in columns_to_look_for):
+                        header = row
+                        try:
+                            sku_idx = header.index("Merchant SKU")
+                            shipped_idx = header.index("Shipped")
+                        except ValueError:
+                            break 
+                else:
+                    if len(row) > max(sku_idx, shipped_idx):
+                        sku = row[sku_idx].strip()
+                        try:
+                            val = float(row[shipped_idx])
+                            aggregated[sku] = aggregated.get(sku, 0.0) + val
+                        except ValueError:
+                            pass
 
-        return {
-            "status": "success",
-            "message": "Conversion Completed Successfully.",
-            "output_path": full_target_path,
-        }
+    if not aggregated:
+        raise RuntimeError("Hata: Hiçbir veriden geçerli 'Merchant SKU' ve 'Shipped' eşleşmesi çıkarılamadı.")
 
-    except Exception as e:
-        raise RuntimeError(f"Dönüştürme sırasında mantıksal bir hata oluştu: {str(e)}")
+    if emit_callback:
+        emit_callback("job-log", {"message": "Veriler bellekte birleştirildi. Disk'e yazılıyor (son.xlsx)..."})
+
+    os.makedirs(target_path, exist_ok=True)
+    out_path = os.path.join(target_path, "son.xlsx")
+    
+    df = pd.DataFrame({
+        "Merchant SKU": list(aggregated.keys()),
+        "Shipped": list(aggregated.values())
+    })
+    
+    df.to_excel(out_path, index=False)
+    return out_path

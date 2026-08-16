@@ -4,7 +4,7 @@ import os
 import tempfile
 import subprocess
 
-GITHUB_API_URL = "https://api.github.com/repos/hasali2603/KWIEKLLC/releases/latest"
+GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 
 def check_internet(host="8.8.8.8", port=53, timeout=5):
@@ -47,20 +47,19 @@ def download_update_file(url, destination, progress_callback=None):
 
 
 def prepare_and_run_batch(update_exe_path):
-    """Güncelleme dosyasını çalıştıracak ve kendini temizleyecek batch dosyasını hazırlar."""
+    """İndirilen kurulum dosyasını (OperationsToolkit_Setup.exe) sessizce
+    çalıştıracak ve kendini temizleyecek batch dosyasını hazırlar.
+
+    Inno Setup kurulumu aynı AppId ile mevcut kurulumun üzerine yazar
+    (yükseltme). Uygulama kapanınca batch kurulumu başlatır.
+    """
     temp_dir = tempfile.gettempdir()
     batch_file_path = os.path.join(temp_dir, "run_update.bat")
     with open(batch_file_path, "w") as batch_file:
         batch_file.write(
             f"@echo off\n"
             f"timeout /t 2 > NUL\n"
-            f'start "" /b "{update_exe_path}"\n'
-            f":wait_loop\n"
-            f'tasklist /FI "IMAGENAME eq KWIEKLLC_update.exe" 2>NUL | find /I /N "KWIEKLLC_update.exe">NUL\n'
-            f'if "%ERRORLEVEL%"=="0" (\n'
-            f"    timeout /t 5 > NUL\n"
-            f"    goto wait_loop\n"
-            f")\n"
+            f'start "" /wait "{update_exe_path}" /SILENT /SUPPRESSMSGBOXES /NORESTART\n'
             f'del /f /q "{update_exe_path}"\n'
             f'del /f /q "%~f0" & exit\n'
         )
