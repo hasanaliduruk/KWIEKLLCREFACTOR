@@ -30,7 +30,7 @@ from core.future_price_updater import process_future_price
 from core.invoice_finder import process_invoice_finder, process_invoice_finder_upc
 from core.expiration_processor import process_expiration
 
-CURRENT_VERSION = "v1.3.0"
+CURRENT_VERSION = "v1.3.3"
 GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
