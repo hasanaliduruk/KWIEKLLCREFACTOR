@@ -78,5 +78,6 @@ jobs:
         files: |
           Output/OperationsToolkit_Setup.exe
           dist/OperationsToolkit-${{ runner.os }}.tar.gz
+          dist/OperationsToolkit-macOS.dmg
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
