@@ -46,6 +46,14 @@ jobs:
     - name: Build with PyInstaller (All Platforms)
       # Eski yaml dosyasındaki "main.py" yerine doğrudan .spec dosyanı tetikliyoruz
       run: pyinstaller build_webview.spec --clean
+    
+    - name: Copy Settings Folder to Dist (Linux & macOS)
+      if: runner.os != 'Windows'
+      run: cp -r Settings dist/OperationsToolkit_Webview/
+
+    - name: Copy Settings Folder to Dist (Windows)
+      if: runner.os == 'Windows'
+      run: xcopy Settings dist\OperationsToolkit_Webview\Settings\ /E /I /H /Y
 
     - name: Compile Inno Setup Installer (Windows)
       if: runner.os == 'Windows'
