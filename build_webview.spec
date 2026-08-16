@@ -21,7 +21,7 @@ a = Analysis(
         ('gui_web', 'gui_web'),
         ('core', 'core'),
         ('utils', 'utils'),
-        ('assets/icon.ico', 'assets'),
+        ('assets', 'assets'),
     ],
     hiddenimports=[
         'webview',
@@ -81,3 +81,12 @@ coll = COLLECT(
     # This ensures Settings folder is not in _internal
     path='.',
 )
+import sys
+
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='OperationsToolkit_Webview.app',
+        icon='assets/icon.icns',
+        bundle_identifier='com.kwiekllc.operationstoolkit',
+    )

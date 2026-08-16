@@ -25,5 +25,5 @@ TestFiles/
 gui/
 main.py
 Settings/*.json
-settings/*.txt
+Settings/*.txt
 build_tkinter.spec

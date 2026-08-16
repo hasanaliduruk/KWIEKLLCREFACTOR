@@ -60,12 +60,17 @@ jobs:
       # GitHub Actions Windows sunucularında Inno Setup (iscc) yüklü gelir
       run: iscc installer.iss
 
-    - name: Archive Build (Linux & macOS)
-      if: runner.os != 'Windows'
-      # Mac ve Linux için üretilen klasörü (onedir) sıkıştırıyoruz
+    - name: Archive Build (Linux)
+      if: runner.os == 'Linux'
       run: |
         cd dist
-        tar -czvf OperationsToolkit-${{ runner.os }}.tar.gz OperationsToolkit_Webview
+        tar -czvf OperationsToolkit-Linux.tar.gz OperationsToolkit_Webview
+
+    - name: Package Build (macOS DMG)
+      if: runner.os == 'macOS'
+      run: |
+        cd dist
+        hdiutil create -volname "OperationsToolkit" -srcfolder "OperationsToolkit_Webview.app" -ov -format UDZO OperationsToolkit-macOS.dmg
 
     - name: Publish to GitHub Releases
       uses: softprops/action-gh-release@v2
