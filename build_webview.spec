@@ -22,7 +22,6 @@ a = Analysis(
         ('core', 'core'),
         ('utils', 'utils'),
         ('assets/icon.ico', 'assets'),
-        ('Settings', 'Settings'),
     ],
     hiddenimports=[
         'webview',
@@ -30,6 +29,7 @@ a = Analysis(
         'keyring',
         'keyring.backends',
         'requests',
+        'screeninfo',
     ],
     hookspath=[],
     hooksconfig={},
@@ -44,7 +44,6 @@ a = Analysis(
         'test',
         'pydoc',
         'doctest',
-        'email',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -78,4 +77,7 @@ coll = COLLECT(
     upx=False,
     upx_exclude=[],
     name='OperationsToolkit_Webview',
+    # Place data files in the base directory alongside the exe
+    # This ensures Settings folder is not in _internal
+    path='.',
 )

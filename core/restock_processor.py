@@ -11,109 +11,59 @@ def find_column(df, possible_columns, error_msg):
     raise ValueError(f"Eksik Sütun Hatası: {error_msg}")
 
 
-def read_settings():
-    sutun_dictionary = {
-        "upc_sutunlari_olabilir": [],
-        "brand_sutunlari_olabilir": [],
-        "price_sutunlari_olabilir": [],
-        "case_sutunlari_olabilir": [],
-        "quantity_sutunlari_olabilir": [],
-        "pk_sutunlari_olabilir": [],
-    }
-    maliyet_dict = {}
-
-    with open("Settings/restock_settings.txt", "r", encoding="utf-8") as file:
-        satirlar = file.readlines()
-
-    a = 0
-    for satir in satirlar:
-        if "=====" in satir:
-            a += 1
-            continue
-
-        if a == 0 and "=" in satir:
-            key, val = satir.split("=", 1)
-            key = key.strip().lower()
-            vals = [v.strip() for v in val.split(",")]
-
-            if key == "upc":
-                sutun_dictionary["upc_sutunlari_olabilir"] = vals
-            elif key == "brand":
-                sutun_dictionary["brand_sutunlari_olabilir"] = vals
-            elif key == "price":
-                sutun_dictionary["price_sutunlari_olabilir"] = vals
-            elif key == "case":
-                sutun_dictionary["case_sutunlari_olabilir"] = vals
-            elif key == "quantity on hand":
-                sutun_dictionary["quantity_sutunlari_olabilir"] = vals
-            elif key == "pk":
-                sutun_dictionary["pk_sutunlari_olabilir"] = vals
-
-        elif a == 1 and ":" in satir:
-            key, val = satir.split(":", 1)
-            maliyet_dict[key.strip()] = float(val.strip())
-
-    return sutun_dictionary, maliyet_dict
-
-
 def process_export(path, row_file, export_files, columns_dict, dataframe_dictionary):
     row_code = os.path.basename(row_file).split("-")[0]
-    row_df = dataframe_dictionary[row_file]
+    row_df = dataframe_dictionary[row_file].copy()
 
     colrow = find_column(
         row_df,
-        columns_dict["upc_sutunlari_olabilir"],
+        columns_dict["upc"],
         f"{row_file} ham dosyası için UPC sütunu bulunamadı.",
     )
-    row_upcs = set(row_df[colrow].tolist())
 
     export_file = next(
         (f for f in export_files if os.path.basename(f).split("-")[0] == row_code), None
     )
+
     if not export_file:
         raise ValueError(f"Eşleşen export dosyası bulunamadı: {row_code}")
 
     export_df = pd.read_excel(export_file, engine="openpyxl")
     colexp = find_column(
         export_df,
-        columns_dict["upc_sutunlari_olabilir"],
+        columns_dict["upc"],
         f"{export_file} export dosyası için UPC sütunu bulunamadı.",
     )
     qtycol = find_column(
         export_df,
-        columns_dict["quantity_sutunlari_olabilir"],
+        columns_dict["Quantity on hand"],
         f"{export_file} export dosyası için Quantity sütunu bulunamadı.",
     )
 
-    upcs = export_df[colexp].tolist()
-    qtyonhand = export_df[qtycol].tolist()
-
-    upcs_unique, idx = np.unique(upcs, return_index=True)
-    qtyonhand_unique = [qtyonhand[i] for i in idx]
-    qty_dict = pd.Series(qtyonhand_unique, index=upcs_unique)
-
-    upcs_set = set(upcs)
-    silinecek_degerler = row_upcs - upcs_set
-    row_df = row_df[~row_df[colrow].isin(silinecek_degerler)].copy()
+    qty_series = export_df.drop_duplicates(subset=[colexp]).set_index(colexp)[qtycol]
+    row_df = row_df[row_df[colrow].isin(qty_series.index)].copy()
 
     price_sutun = find_column(
         row_df,
-        columns_dict["price_sutunlari_olabilir"],
+        columns_dict["price"],
         f"{row_file} ham dosyası için Price sütunu bulunamadı.",
     )
-    quantity_list = row_df[colrow].map(qty_dict).fillna("#YOK")
+    quantity_mapped = row_df[colrow].map(qty_series)
 
     try:
         price_index = row_df.columns.get_loc(price_sutun)
-        row_df.insert(price_index + 1, "Qty on Hand", quantity_list, True)
+        row_df.insert(price_index + 1, "Qty on Hand", quantity_mapped)
     except KeyError:
         insert_idx = min(21, row_df.shape[1])
-        row_df.insert(insert_idx, "Qty on Hand", quantity_list, True)
+        row_df.insert(insert_idx, "Qty on Hand", quantity_mapped)
 
     save_path = os.path.join(path, "sonuclar", os.path.basename(row_file))
-    row_df.to_excel(
+    
+    # Sadece Diske yazılırken görsellik (#YOK) uygulanır
+    row_df.fillna({"Qty on Hand": "#YOK"}).to_excel(
         save_path, index=False, sheet_name="export sonuc", engine="openpyxl"
     )
+    
     return row_df
 
 
@@ -124,13 +74,16 @@ def process_restock_logic(
     restock_files,
     islem,
     save_name,
+    settings_dict,
     progress_callback=None,
 ):
     if not row_files:
         raise ValueError("Ham dosyalar (Row files) eksik.")
 
     os.makedirs(os.path.join(path, "sonuclar"), exist_ok=True)
-    columns_dict, maliyet_dict = read_settings()
+    columns_dict = settings_dict.get("columns", {})
+    maliyet_dict = settings_dict.get("deposits", {})
+    
     dataframe_dictionary = {}
 
     # 1. DOSYALARI OKUMA (paralel - eski uygulamadaki ThreadPool davranışı)
@@ -159,57 +112,65 @@ def process_restock_logic(
                 path, row_file, export_files, columns_dict, dataframe_dictionary
             )
 
-    # 3. BİRBİRİNDEN DÜŞME TESPTİ
+    # 3. BİRBİRİNDEN DÜŞME TESPİTİ (Vektörel Optimizasyon)
     if progress_callback:
-        progress_callback("Silinecek UPC değerleri tespit ediliyor...", 50)
-    remove_upc = {file: [] for file in row_files}
+        progress_callback("UPC çakışmaları ve en düşük fiyatlar vektörel olarak hesaplanıyor...", 50)
+
+    # Adım 3.1: Tüm dosyaların UPC ve Price verilerini tek bir havuza topla
+    all_items = []
     for i, file in enumerate(row_files):
-        this_df = dataframe_dictionary[file]
+        df = dataframe_dictionary[file]
         upc_col = find_column(
-            this_df,
-            columns_dict["upc_sutunlari_olabilir"],
+            df,
+            columns_dict["upc"],
             f"{file} için UPC bulunamadı.",
         )
         price_col = find_column(
-            this_df,
-            columns_dict["price_sutunlari_olabilir"],
+            df,
+            columns_dict["price"],
             f"{file} için Price bulunamadı.",
         )
-        this_upc_dict = this_df.set_index(upc_col)[price_col].to_dict()
 
-        for next_file in row_files[i + 1 :]:
-            next_df = dataframe_dictionary[next_file]
-            n_upc_col = find_column(
-                next_df,
-                columns_dict["upc_sutunlari_olabilir"],
-                f"{next_file} için UPC bulunamadı.",
-            )
-            n_price_col = find_column(
-                next_df,
-                columns_dict["price_sutunlari_olabilir"],
-                f"{next_file} için Price bulunamadı.",
-            )
-            next_upc_dict = next_df.set_index(n_upc_col)[n_price_col].to_dict()
+        # İlgili sütunları al ve standartlaştır
+        temp_df = df[[upc_col, price_col]].copy()
+        temp_df.columns = ["UPC", "Price"]
+        temp_df["File"] = file
+        temp_df["Priority"] = i  # Eşitlik durumunda ilk dosya kazanması için
+        all_items.append(temp_df)
 
-            for upc, price in this_upc_dict.items():
-                if upc in next_upc_dict:
-                    if price < next_upc_dict[upc]:
-                        remove_upc[next_file].append(upc)
-                    elif price > next_upc_dict[upc]:
-                        remove_upc[file].append(upc)
-                    else:
-                        remove_upc[next_file].append(upc)
+    # Tüm dosyaları tek bir Pandas yapısında birleştir
+    combined_df = pd.concat(all_items, ignore_index=True)
+
+    # Fiyat sütununu sayısal değere zorla (String sızmışsa NaN yapar, çökmeyi engeller)
+    combined_df["Price"] = pd.to_numeric(combined_df["Price"], errors="coerce")
+
+    # Adım 3.2: O(1) Hızında Çakışma Çözümü
+    # UPC'ye göre grupla. Fiyatı artan, önceliği artan şekilde sırala.
+    # Böylece her UPC'nin en düşük fiyatlısı (ve eşitlikte ilk dosyası) en üste çıkar.
+    combined_df = combined_df.sort_values(by=["UPC", "Price", "Priority"])
+
+    # En üstteki (kazanan) UPC'leri tut, tekrarları at.
+    winners_df = combined_df.drop_duplicates(subset=["UPC"], keep="first")
+
+    # 4. Adımda kullanmak üzere hangi dosyada hangi UPC'lerin KALACAĞINI bir O(1) Hash Map'e (Set) al
+    keep_upc = {file: set() for file in row_files}
+    for file, group in winners_df.groupby("File"):
+        keep_upc[file] = set(group["UPC"])
+
 
     # 4. BİRBİRİNDEN DÜŞME UYGULAMA
     row_dataframe_dictionary = {}
     for i, file in enumerate(row_files):
         if progress_callback:
             progress_callback(f"UPC'ler siliniyor: {os.path.basename(file)}", 60)
+
         df = dataframe_dictionary[file]
         upc_col = find_column(
-            df, columns_dict["upc_sutunlari_olabilir"], f"{file} için UPC bulunamadı."
+            df, columns_dict["upc"], f"{file} için UPC bulunamadı."
         )
-        df_filtered = df[~df[upc_col].isin(remove_upc[file])]
+
+        # MANTIK DÜZELTİLDİ: "Silinecekleri bul ve çıkar" yerine doğrudan "Kazananları filtrele"
+        df_filtered = df[df[upc_col].isin(keep_upc[file])]
 
         save_path = os.path.join(path, "sonuclar", os.path.basename(file))
         mode = "a" if islem.get("export") == 1 and os.path.exists(save_path) else "w"
@@ -220,226 +181,122 @@ def process_restock_logic(
         else:
             df_filtered.to_excel(save_path, sheet_name="dusulmus liste", index=False)
 
+        # Filtrelenmiş DataFrame bellekte korunuyor (5. adım için)
         row_dataframe_dictionary[file] = df_filtered
 
-    # 5. RESTOCK
+    # 5. RESTOCK (Tamamen Vektörize Edilmiş Mimari)
     if islem.get("restock") == 1:
         if not restock_files:
             raise ValueError("Restock (Ana) excel dosyası eksik.")
         if progress_callback:
-            progress_callback("Restock birleştirmesi yapılıyor...", 70)
+            progress_callback("Restock birleştirmesi vektörel olarak yapılıyor...", 70)
 
         main_excel = restock_files[0]
-        yazilacak_dictionary = {}
         main_excel_df = pd.read_excel(main_excel, engine="openpyxl")
-        lenght = main_excel_df.shape[1]
+        
+        main_upc_col = find_column(main_excel_df, columns_dict["upc"], f"{main_excel} için UPC bulunamadı.")
+        main_pk_col = find_column(main_excel_df, columns_dict["pk"], f"{main_excel} için PK bulunamadı.")
 
-        main_upc_col = find_column(
-            main_excel_df,
-            columns_dict["upc_sutunlari_olabilir"],
-            f"{main_excel} için UPC bulunamadı.",
-        )
-        main_upc_list = main_excel_df[main_upc_col].tolist()
-        main_pk_col = find_column(
-            main_excel_df,
-            columns_dict["pk_sutunlari_olabilir"],
-            f"{main_excel} için PK bulunamadı.",
-        )
-        main_pk_list = main_excel_df[main_pk_col].tolist()
-
-        main_dict = {}
-        for i, upc in enumerate(main_upc_list):
-            main_dict[i] = {
-                "upc": upc,
-                "brand": "#YOK",
-                "suplier": "#YOK",
-                "price": "#YOK",
-                "case": "#YOK",
-                "qtyonhand": "#YOK",
-                "PK": main_pk_list[i],
-                "maliyet": "#YOK",
-            }
-
+        # Adım 5.1: Bütün satır (Row) ve dışa aktarım (Export) verilerini tek bir ilişkisel tabloda topla
+        dfs_to_concat = []
+        supplier_order = [] # Sütunları orjinal sırasıyla eklemek için
+        
         for i, file in enumerate(row_files):
-            row_upc_col = find_column(
-                row_dataframe_dictionary[file],
-                columns_dict["upc_sutunlari_olabilir"],
-                "UPC Yok",
-            )
-            row_case_col = find_column(
-                row_dataframe_dictionary[file],
-                columns_dict["case_sutunlari_olabilir"],
-                "Case Yok",
-            )
-            row_quantity_col = find_column(
-                row_dataframe_dictionary[file],
-                columns_dict["quantity_sutunlari_olabilir"],
-                "Quantity Yok",
-            )
+            filename = os.path.basename(file).split("-")[0]
+            supplier_order.append(filename)
+            
+            # Export DataFrame Sütunları
+            exp_df = dataframe_dictionary[file]
+            e_upc = find_column(exp_df, columns_dict["upc"], "UPC Yok")
+            e_price = find_column(exp_df, columns_dict["price"], "Price Yok")
+            e_brand = find_column(exp_df, columns_dict["brand"], "Brand Yok")
+            e_qty = find_column(exp_df, columns_dict["Quantity on hand"], "Quantity Yok")
+            
+            exp_subset = exp_df[[e_upc, e_price, e_qty, e_brand]].copy()
+            exp_subset.columns = ["UPC", "Price", "E_Qty", "Brand"]
+            exp_subset["Price"] = pd.to_numeric(exp_subset["Price"], errors="coerce")
+            
+            # Row DataFrame Sütunları
+            row_df = row_dataframe_dictionary[file]
+            r_upc = find_column(row_df, columns_dict["upc"], "UPC Yok")
+            r_case = find_column(row_df, columns_dict["case"], "Case Yok")
+            r_qty = find_column(row_df, columns_dict["Quantity on hand"], "Quantity Yok")
+            
+            row_subset = row_df[[r_upc, r_case, r_qty]].copy()
+            row_subset.columns = ["UPC", "Case", "R_Qty"]
+            
+            # O(1) İlişkisel Birleştirme (Inner Join)
+            merged = pd.merge(exp_subset, row_subset, on="UPC", how="inner")
+            merged["Supplier"] = filename
+            merged["Priority"] = i
+            
+            dfs_to_concat.append(merged)
 
-            export_upc_col = find_column(
-                dataframe_dictionary[file],
-                columns_dict["upc_sutunlari_olabilir"],
-                "UPC Yok",
-            )
-            export_price_col = find_column(
-                dataframe_dictionary[file],
-                columns_dict["price_sutunlari_olabilir"],
-                "Price Yok",
-            )
-            export_brand_col = find_column(
-                dataframe_dictionary[file],
-                columns_dict["brand_sutunlari_olabilir"],
-                "Brand Yok",
-            )
-            export_quantity_col = find_column(
-                dataframe_dictionary[file],
-                columns_dict["quantity_sutunlari_olabilir"],
-                "Quantity Yok",
-            )
-
-            row_upc_list = row_dataframe_dictionary[file][row_upc_col].tolist()
-            row_case_list = row_dataframe_dictionary[file][row_case_col].tolist()
-            row_quantity_list = row_dataframe_dictionary[file][
-                row_quantity_col
-            ].tolist()
-
-            export_upc_list = dataframe_dictionary[file][export_upc_col].tolist()
-            export_price_list = dataframe_dictionary[file][export_price_col].tolist()
-            export_brand_list = dataframe_dictionary[file][export_brand_col].tolist()
-            export_quantity_list = dataframe_dictionary[file][
-                export_quantity_col
-            ].tolist()
-
-            export_dict = {}
-            for j, upc in enumerate(export_upc_list):
-                export_dict[upc] = {
-                    "price": export_price_list[j],
-                    "quantity": export_quantity_list[j],
-                    "brand": export_brand_list[j],
-                }
-
-            row_dict = {}
-            for j, upc in enumerate(row_upc_list):
-                row_dict[upc] = {
-                    "case": row_case_list[j],
-                    "quantity": row_quantity_list[j],
-                }
-
-            yazilacak_dictionary[file] = {"price": [], "quantity": []}
-
-            for index in main_dict.keys():
-                upc = main_dict[index]["upc"]
-                if upc in export_upc_list:
-                    x = True
-                    if main_dict[index].keys() != []:
-                        for key in main_dict[index].keys():
-                            if str(key).endswith(".xlsx"):
-                                if main_dict[index][key]["price"] != "#YOK":
-                                    if (
-                                        main_dict[index][key]["price"]
-                                        > export_dict[upc]["price"]
-                                    ):
-                                        pass
-                                    elif (
-                                        main_dict[index][key]["price"]
-                                        < export_dict[upc]["price"]
-                                    ):
-                                        x = False
-                                        break
-                    main_dict[index][file] = {}
-                    main_dict[index][file]["quantity"] = export_dict[upc]["quantity"]
-                    main_dict[index][file]["price"] = export_dict[upc]["price"]
-                    main_dict[index]["brand"] = export_dict[upc]["brand"]
-                    if x == True:
-                        main_dict[index]["price"] = export_dict[upc]["price"]
-                else:
-                    main_dict[index][file] = {"quantity": "#YOK", "price": "#YOK"}
-
-                yazilacak_dictionary[file]["price"].append(
-                    main_dict[index][file]["price"]
-                )
-                yazilacak_dictionary[file]["quantity"].append(
-                    main_dict[index][file]["quantity"]
-                )
-
-                filename = os.path.basename(file).split("-")[0]
-                if upc in row_upc_list:
-                    main_dict[index]["suplier"] = filename
-                    main_dict[index]["case"] = row_dict[upc]["case"]
-                    main_dict[index]["qtyonhand"] = row_dict[upc]["quantity"]
+        # Tüm veriyi Pandas hafızasında birleştir
+        all_supplier_data = pd.concat(dfs_to_concat, ignore_index=True)
+        
+        # Adım 5.2: Her UPC için En Düşük Fiyatlı (Kazanan) Tedarikçiyi Bul
+        all_supplier_data = all_supplier_data.sort_values(by=["UPC", "Price", "Priority"])
+        winners_df = all_supplier_data.drop_duplicates(subset=["UPC"], keep="first").set_index("UPC")
+        
+        # Adım 5.3: Tedarikçilere Özel Fiyat ve Miktarları Pivot Tabloya Çevir
+        unique_for_pivot = all_supplier_data.drop_duplicates(subset=["UPC", "Supplier"])
+        pivot_price = unique_for_pivot.set_index(["UPC", "Supplier"])["Price"].unstack()
+        pivot_qty = unique_for_pivot.set_index(["UPC", "Supplier"])["E_Qty"].unstack()
 
         if progress_callback:
+            progress_callback("Veriler Ana Excel'e entegre ediliyor...", 80)
+            
+        # Adım 5.4: Ana DataFrame'e Verileri Haritalama (Mapping)
+        main_upcs = main_excel_df[main_upc_col]
+        
+        # Yeni eklenecek sütunları parçalanmayı (fragmentation) önlemek için sözlükte topla
+        new_columns = {}
+        
+        new_columns["Brand"] = main_upcs.map(winners_df["Brand"])
+        new_columns["Price"] = main_upcs.map(winners_df["Price"])
+        
+        # Maliyet Hesaplaması (Döngüsüz, Tamamen Vektörel)
+        winning_suppliers = main_upcs.map(winners_df["Supplier"])
+        
+        # PK sütununu temizle ve sayısala çevir
+        pk_numeric = main_excel_df[main_pk_col].astype(str).str.replace("PK", "").apply(pd.to_numeric, errors="coerce")
+        sup_costs = winning_suppliers.map(maliyet_dict).fillna(0.0)
+        
+        maliyet_calc = (pk_numeric * new_columns["Price"]) + sup_costs
+        new_columns["Maliyet"] = maliyet_calc.fillna(new_columns["Price"])
+        
+        new_columns["Case"] = main_upcs.map(winners_df["Case"])
+        
+        # Tedarikçi Özel Fiyatları
+        for sup in supplier_order:
+            col_name = f"{sup} price"
+            new_columns[col_name] = main_upcs.map(pivot_price[sup]) if sup in pivot_price.columns else np.nan
+            
+        new_columns["Qty on Hand"] = main_upcs.map(winners_df["R_Qty"])
+        
+        # Tedarikçi Özel Miktarları
+        for sup in supplier_order:
+            col_name = f"{sup} quantity"
+            new_columns[col_name] = main_upcs.map(pivot_qty[sup]) if sup in pivot_qty.columns else np.nan
+            
+        new_columns["suplier"] = winning_suppliers
+        
+        # Adım 5.5: Yeni Sütunları Tek Seferde Birleştir ve Temizle
+        new_cols_df = pd.DataFrame(new_columns, index=main_excel_df.index)
+        final_df = pd.concat([main_excel_df, new_cols_df], axis=1)
+        
+        if progress_callback:
             progress_callback("Restock dosyası kaydediliyor...", 90)
-
-        brand_list, suplier_list, price_list, case_list, quantity_list, maliyet_list = (
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-        )
-        for index in main_dict.keys():
-            brand_list.append(main_dict[index]["brand"])
-            suplier_list.append(main_dict[index]["suplier"])
-            price_list.append(main_dict[index]["price"])
-            case_list.append(main_dict[index]["case"])
-            quantity_list.append(main_dict[index]["qtyonhand"])
-
-            if main_dict[index]["PK"] != "#YOK" and main_dict[index]["price"] != "#YOK":
-                try:
-                    pk = int(str(main_dict[index]["PK"]).replace("PK", ""))
-                    maliyet_list.append(
-                        (pk * float(main_dict[index]["price"]))
-                        + float(maliyet_dict[main_dict[index]["suplier"]])
-                    )
-                except Exception:
-                    maliyet_list.append(main_dict[index]["price"])
-            else:
-                maliyet_list.append(main_dict[index]["price"])
-
-        main_excel_df.insert(lenght, "Brand", brand_list, True)
-        main_excel_df.insert(lenght + 1, "Price", price_list, True)
-        main_excel_df.insert(lenght + 2, "Maliyet", maliyet_list, True)
-        main_excel_df.insert(lenght + 3, "Case", case_list, True)
-
-        a = 4
-        for file in yazilacak_dictionary.keys():
-            filename = os.path.basename(file).split("-")[0]
-            main_excel_df.insert(
-                lenght + a,
-                filename + " price",
-                yazilacak_dictionary[file]["price"],
-                True,
-            )
-            a += 1
-
-        main_excel_df.insert(lenght + a, "Qty on Hand", quantity_list, True)
-        a = 5
-
-        for file in yazilacak_dictionary.keys():
-            filename = os.path.basename(file).split("-")[0]
-            main_excel_df.insert(
-                lenght + len(yazilacak_dictionary.keys()) + a,
-                filename + " quantity",
-                yazilacak_dictionary[file]["quantity"],
-                True,
-            )
-            a += 1
-
-        main_excel_df.insert(
-            lenght + len(yazilacak_dictionary.keys()) + a, "suplier", suplier_list, True
-        )
-
-        try:
-            silme_kosul = ~main_excel_df["Price"].isin(["#YOK", "#YOK"])
-            main_excel_df = main_excel_df[silme_kosul]
-        except Exception:
-            pass
-
+            
+        # Price verisi NaN olanları (eski kodda mantıksızca "#YOK" basılanları) DataFrame'den uçur
+        final_df = final_df.dropna(subset=["Price"])
+        
+        # NaN olarak hesaplanan ve bellekte sayısal kalan verileri sadece diske yazarken görsel "#YOK"a çevir
+        final_df = final_df.fillna("#YOK")
+        
         os.makedirs(os.path.join(path, "restock"), exist_ok=True)
-        main_excel_df.to_excel(
+        final_df.to_excel(
             os.path.join(path, "restock", f"{save_name}.xlsx"),
             index=False,
             sheet_name="restock",

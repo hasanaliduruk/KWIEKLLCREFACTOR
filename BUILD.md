@@ -1,5 +1,20 @@
 # Build & Sign
 
+## Python version (IMPORTANT)
+
+Builds MUST run under **Python 3.13**, NOT 3.14. PyInstaller 6.x produces a
+broken (empty `_internal`) bundle on Python 3.14 that crashes at startup with
+`Failed to import encodings module`. `build_shared.bat` auto-creates a
+`.venv313` venv (via `py -3.13`) and installs `requirements.txt` into it, then
+builds from that venv — so just run the bat and it handles the version for you.
+
+If you build manually, activate the venv first:
+
+```
+.\.venv313\Scripts\activate
+pyinstaller build_webview.spec --noconfirm --distpath dist --workpath build_webview
+```
+
 ## Quick build (webview version)
 
 ```
@@ -55,7 +70,7 @@ build_shared.bat
 
 ## Version
 
-The app version is the `CURRENT_VERSION` constant in `app.py` (e.g. `v1.2.4`).
+The app version is the `CURRENT_VERSION` constant in `app.py` (e.g. `v1.2.5`).
 The repo-root `version.txt` is a **PyInstaller version resource file** — it
 embeds Windows file properties (company name, description, file version) into
 the built exe via the `version='../version.txt'` line in `build_webview.spec`.

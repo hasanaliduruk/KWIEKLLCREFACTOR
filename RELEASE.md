@@ -7,7 +7,7 @@ one — no manual unzip/reinstall).
 ## How the in-app updater works
 
 1. On startup (and via the **Check for Updates** button) the app calls the
-   GitHub Releases API for `hasali2603/KWIEKLLC`.
+   GitHub Releases API for `hasali2603/KWIEKLLCREFACTOR`.
 2. It compares the latest release `tag_name` (e.g. `v1.2.5`) with the bundled
    `CURRENT_VERSION` in `app.py`.
 3. If a newer release exists, the Updates view shows the version, release

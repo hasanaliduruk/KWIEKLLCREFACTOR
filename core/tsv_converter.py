@@ -4,6 +4,7 @@ import glob
 import pandas as pd
 import openpyxl
 from xlsxwriter import Workbook
+from typing import List, Callable
 
 
 def _read_tsv_settings(settings_path: str):
@@ -30,97 +31,59 @@ def _read_tsv_settings(settings_path: str):
     return default_columns
 
 
-def convert_tsv_to_excel(
-    file_path: str,
-    target_path: str,
-    target_name: str,
-    settings_path: str = None,
-) -> dict:
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Hata: Belirtilen dosya bulunamadı -> {file_path}")
+def process_tsvs_and_aggregate(files: List[str], target_path: str, settings_path: str = None, emit_callback: Callable = None) -> str:
+    """
+    Reads a provided list of TSV files directly into memory, aggregates 'Shipped' quantities,
+    emits progress, and writes only the final son.xlsx file.
+    """
+    if not files:
+        raise ValueError("Hata: İşlenecek dosya listesi boş.")
 
-    if target_name == "" or target_name == " " or target_name is None:
-        target_name = "Converted_File"
+    columns_to_look_for = _read_tsv_settings(settings_path) # Assumes _read_tsv_settings is defined as before
+    aggregated = {}
+    total_files = len(files)
 
-    if not target_name.endswith(".xlsx"):
-        target_name += ".xlsx"
-
-    os.makedirs(target_path, exist_ok=True)
-    full_target_path = os.path.join(target_path, target_name)
-
-    # Header detection: skip rows until a header row containing one of the
-    # configured columns is found, then write every following row. This
-    # restores the behaviour of the original tsv_script() (xlsx_converter).
-    columns = _read_tsv_settings(settings_path)
-
-    try:
-        workbook = Workbook(full_target_path)
-        worksheet = workbook.add_worksheet()
-
+    for i, file_path in enumerate(files, start=1):
+        if emit_callback:
+            emit_callback("job-log", {"message": f"Processing in-memory ({i}/{total_files}): {os.path.basename(file_path)}"})
+            
         with open(file_path, "rt", encoding="utf8") as f:
             reader = csv.reader(f, delimiter="\t")
-            header_found = False
-            row1 = 0
+            header = None
+            sku_idx = -1
+            shipped_idx = -1
+
             for row in reader:
-                if not header_found:
-                    for col in columns:
-                        if col in row:
-                            header_found = True
-                            break
-                if header_found:
-                    worksheet.write_row(row1, 0, row)
-                    row1 += 1
-        workbook.close()
+                if header is None:
+                    if any(col in row for col in columns_to_look_for):
+                        header = row
+                        try:
+                            sku_idx = header.index("Merchant SKU")
+                            shipped_idx = header.index("Shipped")
+                        except ValueError:
+                            break 
+                else:
+                    if len(row) > max(sku_idx, shipped_idx):
+                        sku = row[sku_idx].strip()
+                        try:
+                            val = float(row[shipped_idx])
+                            aggregated[sku] = aggregated.get(sku, 0.0) + val
+                        except ValueError:
+                            pass
 
-        wb = openpyxl.load_workbook(full_target_path)
-        sheet = wb.active
-        for column_cells in sheet.columns:
-            length = max(len(str(cell.value) or "") for cell in column_cells)
-            sheet.column_dimensions[
-                openpyxl.utils.get_column_letter(column_cells[0].column)
-            ].width = (length + 3)
-        wb.save(full_target_path)
+    if not aggregated:
+        raise RuntimeError("Hata: Hiçbir veriden geçerli 'Merchant SKU' ve 'Shipped' eşleşmesi çıkarılamadı.")
 
-        return {
-            "status": "success",
-            "message": "Conversion Completed Successfully.",
-            "output_path": full_target_path,
-        }
+    if emit_callback:
+        emit_callback("job-log", {"message": "Veriler bellekte birleştirildi. Disk'e yazılıyor (son.xlsx)..."})
 
-    except Exception as e:
-        raise RuntimeError(f"Dönüştürme sırasında mantıksal bir hata oluştu: {str(e)}")
-
-
-def compare_and_write(target_path: str) -> str:
-    """Aggregate every produced xlsx in `target_path`: sum `Shipped` per
-    `Merchant SKU` and write the combined result to `son.xlsx`.
-
-    Restores the original tsv_script() compare_and_write() step.
-    """
-    files = [
-        f for f in glob.glob(os.path.join(target_path, "*.xlsx"))
-        if os.path.basename(f).lower() != "son.xlsx"
-    ]
-    if not files:
-        raise RuntimeError("Hata: Birleştirilecek dönüştürülmüş dosya bulunamadı.")
-
-    aggregated = {}
-    for f in files:
-        df = pd.read_excel(f)
-        if "Merchant SKU" not in df.columns or "Shipped" not in df.columns:
-            continue
-        skus = df["Merchant SKU"].tolist()
-        shipped = df["Shipped"].tolist()
-        for i, sku in enumerate(skus):
-            try:
-                aggregated[sku] = aggregated.get(sku, 0) + float(shipped[i])
-            except (ValueError, TypeError):
-                pass
-
-    result = pd.DataFrame({
-        "Merchant SKU": list(aggregated.keys()),
-        "Shipped": list(aggregated.values()),
-    })
+    os.makedirs(target_path, exist_ok=True)
     out_path = os.path.join(target_path, "son.xlsx")
-    result.to_excel(out_path, index=False)
+    
+    df = pd.DataFrame({
+        "Merchant SKU": list(aggregated.keys()),
+        "Shipped": list(aggregated.values())
+    })
+    
+    df.to_excel(out_path, index=False)
     return out_path

@@ -4,7 +4,7 @@ import os
 import tempfile
 import subprocess
 
-GITHUB_API_URL = "https://api.github.com/repos/hasali2603/KWIEKLLC/releases/latest"
+GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 
 def check_internet(host="8.8.8.8", port=53, timeout=5):

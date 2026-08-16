@@ -1,60 +1,69 @@
-name: Cross-Platform Build and Release
+name: Cross-Platform Python Build
 
 on:
   push:
     tags:
       - 'v*'
-permissions:
-  contents: write
-  
+  workflow_dispatch:
+
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  build-python:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.13
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.13'
+        cache: 'pip'
 
     - name: Install System Dependencies (Linux)
       if: runner.os == 'Linux'
+      # Linux üzerinde pywebview ve grafik kütüphanelerinin derlenebilmesi için zorunludur
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-tk python3-dev
+        sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev libgirepository1.0-dev libcairo2-dev gir1.2-gtk-3.0
 
     - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller
 
-    - name: Build with PyInstaller (Linux & macOS)
-      if: runner.os != 'Windows'
-      run: pyinstaller --noconfirm --onedir --windowed --add-data "assets:assets" main.py
+    - name: Install macOS specific Webview dependencies
+      if: runner.os == 'macOS'
+      # macOS üzerinde pywebview'in çalışması için PyObjC Cocoa köprüleri şarttır
+      run: pip install pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit
 
-    - name: Build with PyInstaller (Windows)
+    - name: Build with PyInstaller (All Platforms)
+      # Eski yaml dosyasındaki "main.py" yerine doğrudan .spec dosyanı tetikliyoruz
+      run: pyinstaller build_webview.spec --clean
+
+    - name: Compile Inno Setup Installer (Windows)
       if: runner.os == 'Windows'
-      shell: cmd
-      run: pyinstaller --noconfirm --onedir --windowed --add-data "assets;assets" --collect-all tkinterdnd2 main.py
+      # GitHub Actions Windows sunucularında Inno Setup (iscc) yüklü gelir
+      run: iscc installer.iss
 
-    - name: Archive Build (Zip)
-      uses: thedoctor0/zip-release@0.7.5
-      with:
-        type: 'zip'
-        filename: 'KwiekLLC-${{ runner.os }}.zip'
-        directory: 'dist/main'
+    - name: Archive Build (Linux & macOS)
+      if: runner.os != 'Windows'
+      # Mac ve Linux için üretilen klasörü (onedir) sıkıştırıyoruz
+      run: |
+        cd dist
+        tar -czvf OperationsToolkit-${{ runner.os }}.tar.gz OperationsToolkit_Webview
 
     - name: Publish to GitHub Releases
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/main/KwiekLLC-${{ runner.os }}.zip
+        files: |
+          Output/OperationsToolkit_Setup.exe
+          dist/OperationsToolkit-${{ runner.os }}.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

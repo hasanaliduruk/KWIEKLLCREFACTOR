@@ -7,10 +7,9 @@ from bs4 import XMLParsedAsHTMLWarning
 import openpyxl
 
 
-def ensure_settings():
+def ensure_settings(settings_path):
     if not os.path.exists("Settings"):
         os.makedirs("Settings")
-    settings_path = "Settings/expration_settings.txt"
     if not os.path.exists(settings_path):
         with open(settings_path, "w", encoding="utf-8") as file:
             file.write(
@@ -22,7 +21,7 @@ def ensure_settings():
             )
 
 
-def read_settings():
+def read_settings(settings_path):
     dictionary = {
         "login_button_id": [],
         "email_id": [],
@@ -30,7 +29,7 @@ def read_settings():
         "default_email": [],
         "default_password": [],
     }
-    with open("Settings/expration_settings.txt", "r", encoding="utf-8") as file:
+    with open(settings_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
         for line in lines:
             parts = line.split("=")
@@ -139,7 +138,7 @@ def write_combined_excel(main_dictionary, path):
 
 
 def process_expiration(
-    username, password, item_ids_str, output_path, progress_callback=None
+    username, password, item_ids_str, output_path, settings_path, progress_callback=None
 ):
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
@@ -150,8 +149,8 @@ def process_expiration(
     if not os.path.exists(output_path):
         os.makedirs(output_path, exist_ok=True)
 
-    ensure_settings()
-    settings = read_settings()
+    ensure_settings(settings_path)
+    settings = read_settings(settings_path)
 
     if progress_callback:
         progress_callback("2D Workflow'a giriş yapılıyor...", "white")

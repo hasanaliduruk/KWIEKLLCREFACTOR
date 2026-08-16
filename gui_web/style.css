@@ -1,9 +1,152 @@
 /* =========================================================================
    Operations Toolkit — design tokens
-   Palette: graphite workspace + amber "processing" accent
+   Theme system: 4 themes + font-size scale
    ========================================================================= */
 
-:root {
+/* ── Theme: Daylight (Light body + Dark sidebar) ── */
+:root,
+[data-theme="daylight"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #2d8651;
+  --btn-primary-bg-hover: #5b9472;
+  --console-bg: #eef0f4;
+  --console-text: #2a3040;
+  
+  --bg: #f7f4ed; 
+  --panel: #ffffff;
+  --panel-raised: #e7f5f3;
+  --line: #e2dfd8;
+  --line-soft: #e8eaee;
+  
+  /* Hata düzeltildi: Global metin rengi koyu yapıldı */
+  --text: #2a3040; 
+  --text-dim: #5a6070;
+  --text-faint: #9099ab;
+  
+  --accent: #87a96b;
+  --accent-dim: #708d4c;
+  --accent-soft: rgba(135, 169, 107, 0.15);
+  
+  --ok: #27a85a;
+  --ok-soft: rgba(39, 168, 90, 0.12);
+  --err: #d94040;
+  --err-soft: rgba(217, 64, 64, 0.10);
+  
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.8) inset, 0 4px 16px rgba(0,0,0,0.08);
+  --scrollbar-thumb: #c8cdd8;
+  --scrollbar-thumb-hover: #adb4c2;
+  --checkbox-tick: #ffffff;
+
+  /* Sidebar Isolation (Sadece bu alan koyu) */
+  --sidebar-bg: #27313f;
+  --sidebar-active-bg: #84af4f;
+  --sidebar-active-text: #222222;
+  --sidebar-text: #eef0f4;
+  --sidebar-text-dim: #b0bbca;
+  --sidebar-hover-bg: #323e4f;
+  --sidebar-title-text: #b6c294;
+}
+
+/* ================================================================
+   THEME: CARBON
+   Corporate / Serious / Premium
+   ================================================================ */
+[data-theme="carbon"] {
+  --btn-primary-text: #15171a;
+  --btn-primary-bg: #d5a84f;
+  --btn-primary-bg-hover: #e4bd6b;
+
+  --console-bg: #0a0c0e;
+  --console-text: #c1c7cd;
+
+  --bg: #0f1113;
+  --panel: #171a1d;
+  --panel-raised: #1d2125;
+
+  --line: #292e33;
+  --line-soft: #202428;
+
+  --text: #f0f2f3;
+  --text-dim: #9ba1a7;
+  --text-faint: #626970;
+
+  --accent: #d5a84f;
+  --accent-dim: #e4bd6b;
+  --accent-soft: rgba(213, 168, 79, 0.12);
+
+  --ok: #62c98a;
+  --ok-soft: rgba(98, 201, 138, 0.12);
+
+  --err: #e56868;
+  --err-soft: rgba(229, 104, 104, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 6px 24px rgba(0,0,0,0.38);
+
+  --scrollbar-thumb: #363c42;
+  --scrollbar-thumb-hover: #474e55;
+
+  --checkbox-tick: #0f1113;
+
+  /* Sidebar */
+  --sidebar-bg: #121416;
+  --sidebar-active-bg: rgba(213, 168, 79, 0.13);
+  --sidebar-active-text: #e4bd6b;
+  --sidebar-text: #f0f2f3;
+  --sidebar-text-dim: #9ba1a7;
+  --sidebar-hover-bg: #1b1e21;
+  --sidebar-title-text: #777e85;
+}
+
+/* ── Theme: Ocean (Deep Blue) ── */
+[data-theme="ocean"] {
+  --btn-primary-text: #222222;
+  --btn-primary-bg: #3b9fd8;
+  --btn-primary-bg-hover: #55b0e4;
+  --console-bg: #080e18;
+  --console-text: #a8c4e0;
+  --bg: #0d1520;
+  --panel: #121c2c;
+  --panel-raised: #172234;
+  --line: #243348;
+  --line-soft: #1c2840;
+  
+  --text: #d6e4f7;
+  --text-dim: #7fa0c4;
+  --text-faint: #4d6d8a;
+  
+  --accent: #3b9fd8;
+  --accent-dim: #55b0e4;
+  --accent-soft: rgba(59, 159, 216, 0.13);
+  
+  --ok: #4cc9a0;
+  --ok-soft: rgba(76, 201, 160, 0.12);
+  --err: #e06060;
+  --err-soft: rgba(224, 96, 96, 0.12);
+  
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 28px rgba(0,0,0,0.38);
+  --scrollbar-thumb: #2a3f58;
+  --scrollbar-thumb-hover: #374f6e;
+  --checkbox-tick: #0d1520;
+
+  /* Sidebar Isolation */
+  --sidebar-bg: #121c2c;
+  --sidebar-active-bg: rgba(59, 159, 216, 0.13);
+  --sidebar-active-text: #3b9fd8;
+  --sidebar-text: #d6e4f7;
+  --sidebar-text-dim: #7fa0c4;
+  --sidebar-hover-bg: #172234;
+  --sidebar-title-text: #7fa0c4;
+}
+
+/* ── Theme: Graphite (default dark) ── */
+[data-theme="graphite"] {
+  --btn-primary-text: #222222;
+  --btn-primary-bg: #73a322;
+  --btn-primary-bg-hover: #6d9f4c;
+  --console-bg: #0e1014;
+  --console-text: #c7c9cf;
   --bg: #15171c;
   --panel: #1b1e25;
   --panel-raised: #21242c;
@@ -23,13 +166,833 @@
   --err: #e8615f;
   --err-soft: rgba(232, 97, 95, 0.12);
 
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.28);
+  --scrollbar-thumb: #3a3e48;
+  --scrollbar-thumb-hover: #494e5a;
+  --checkbox-tick: #15171c;
+
+  /* Sidebar Isolation */
+  --sidebar-bg: #1b1e25;
+  --sidebar-active-bg: rgba(120, 147, 87, 0.12);
+  --sidebar-active-text: #73a322;
+  --sidebar-text: #e7e8ea;
+  --sidebar-text-dim: #9a9da6;
+  --sidebar-hover-bg: #21242c;
+  --sidebar-title-text: #9a9da6;
+}
+
+[data-theme="daylight-soft"] {
+  /* ================================================================
+     DAYLIGHT SOFT
+     Dark Muted Gray / Low Contrast
+     ================================================================ */
+
+  /* Buttons */
+  --btn-primary-text: #f2f5f3;
+  --btn-primary-bg: #4b795e;
+  --btn-primary-bg-hover: #5d8e70;
+
+  /* Console */
+  --console-bg: #a9b0ac;
+  --console-text: #2d3431;
+
+
+  /* ================================================================
+     Main Background
+     ================================================================ */
+
+  --bg: #adb4b0;
+  --panel: #b9bfbc;
+  --panel-raised: #a1aaa5;
+
+
+  /* ================================================================
+     Borders
+     ================================================================ */
+
+  --line: #9ca5a0;
+  --line-soft: #a6aea9;
+
+
+  /* ================================================================
+     Text
+     ================================================================ */
+
+  --text: #2e3532;
+  --text-dim: #555f5a;
+  --text-faint: #727c77;
+
+
+  /* ================================================================
+     Accent
+     ================================================================ */
+
+  --accent: #6f925c;
+  --accent-dim: #5d7d4b;
+  --accent-soft: rgba(111, 146, 92, 0.15);
+
+
+  /* ================================================================
+     Status
+     ================================================================ */
+
+  --ok: #317d55;
+  --ok-soft: rgba(49, 125, 85, 0.12);
+
+  --err: #bd5050;
+  --err-soft: rgba(189, 80, 80, 0.10);
+
+
+  /* ================================================================
+     Cards / Shadows
+     ================================================================ */
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.20) inset,
+    0 4px 14px rgba(25,35,30,0.15);
+
+
+  /* ================================================================
+     Scrollbar
+     ================================================================ */
+
+  --scrollbar-thumb: #858f89;
+  --scrollbar-thumb-hover: #707b75;
+
+
+  /* ================================================================
+     Checkbox
+     ================================================================ */
+
+  --checkbox-tick: #ffffff;
+
+
+  /* ================================================================
+     Sidebar
+     ================================================================ */
+
+  --sidebar-bg: #27313f;
+  --sidebar-active-bg: #84af4f;
+  --sidebar-active-text: #222222;
+  --sidebar-text: #eef0f4;
+  --sidebar-text-dim: #b0bbca;
+  --sidebar-hover-bg: #323e4f;
+  --sidebar-title-text: #b6c294;
+}
+
+[data-theme="special"] {
+  /* ================================================================
+     SPECIAL
+     Dark Green Background / Deep Blue Sidebar
+     ================================================================ */
+
+  /* Buttons */
+  --btn-primary-text: #222222;
+  --btn-primary-bg: #3b9fd8;
+  --btn-primary-bg-hover: #55b0e4;
+
+  /* Console */
+  --console-bg: #080e18;
+  --console-text: #a8c4e0;
+
+  /* Main Background */
+  --bg: #1e2922;
+  --panel: #18201b;
+  --panel-raised: #243129;
+
+  /* Borders */
+  --line: #314039;
+  --line-soft: #27342d;
+
+  /* Text */
+  --text: #d6e4d9;
+  --text-dim: #8ca896;
+  --text-faint: #587064;
+
+  /* Accent */
+  --accent: #3b9fd8;
+  --accent-dim: #55b0e4;
+  --accent-soft: rgba(59, 159, 216, 0.13);
+
+  /* Status */
+  --ok: #4cc9a0;
+  --ok-soft: rgba(76, 201, 160, 0.12);
+
+  --err: #e06060;
+  --err-soft: rgba(224, 96, 96, 0.12);
+
+  /* Shadows */
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.03) inset,
+    0 8px 28px rgba(0,0,0,0.38);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #385047;
+  --scrollbar-thumb-hover: #49645a;
+
+  /* Checkbox */
+  --checkbox-tick: #1e2922;
+
+
+  /* ================================================================
+     Sidebar
+     ================================================================ */
+
+  /* Intentionally much darker than main background */
+  --sidebar-bg: #0d1820;
+
+  --sidebar-active-bg: rgba(59, 159, 216, 0.16);
+  --sidebar-active-text: #55b0e4;
+
+  --sidebar-text: #d6e4d9;
+  --sidebar-text-dim: #82968a;
+
+  --sidebar-hover-bg: #15242c;
+  --sidebar-title-text: #6f8378;
+}
+
+/* ── Theme: Sıcak Krem (Warm Sepia) ── */
+[data-theme="warm"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #2d8651;
+  --btn-primary-bg-hover: #5b9472;
+  --console-bg: #ede6d8;
+  --console-text: #3c2e1e;
+  --bg: #f5f0e8;
+  --panel: #fdf8f0;
+  --panel-raised: #f7f1e5;
+  --line: #e0d4bf;
+  --line-soft: #ede6d8;
+  
+  --text: #2c2318;
+  --text-dim: #7a6a55;
+  --text-faint: #a89880;
+  
+  --accent: #b06020;
+  --accent-dim: #c47030;
+  --accent-soft: rgba(176, 96, 32, 0.10);
+  
+  --ok: #4a8c3a;
+  --ok-soft: rgba(74, 140, 58, 0.12);
+  --err: #c43030;
+  --err-soft: rgba(196, 48, 48, 0.10);
+  
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.7) inset, 0 4px 16px rgba(80,50,10,0.10);
+  --scrollbar-thumb: #d4c4aa;
+  --scrollbar-thumb-hover: #bfad93;
+  --checkbox-tick: #fdf8f0;
+
+  /* Sidebar Isolation */
+  --sidebar-bg: #fdf8f0;
+  --sidebar-active-bg: rgba(176, 96, 32, 0.10);
+  --sidebar-active-text: #b06020;
+  --sidebar-text: #2c2318;
+  --sidebar-text-dim: #7a6a55;
+  --sidebar-hover-bg: #f7f1e5;
+  --sidebar-title-text: #7a6a55;
+}
+
+/* ================================================================
+   THEME: MIDNIGHT PURPLE
+   Modern / Premium Dark
+   ================================================================ */
+
+[data-theme="midnight"] {
+  --btn-primary-text: #222222;
+  --btn-primary-bg: #9b7bea;
+  --btn-primary-bg-hover: #b093f0;
+
+  --console-bg: #0c0b12;
+  --console-text: #c8bee0;
+
+  --bg: #11101a;
+  --panel: #181622;
+  --panel-raised: #201d2d;
+
+  --line: #302b40;
+  --line-soft: #242130;
+
+  --text: #eeeaf7;
+  --text-dim: #aaa3bd;
+  --text-faint: #706980;
+
+  --accent: #9b7bea;
+  --accent-dim: #b093f0;
+  --accent-soft: rgba(155, 123, 234, 0.13);
+
+  --ok: #61d6a3;
+  --ok-soft: rgba(97, 214, 163, 0.12);
+
+  --err: #ed6b83;
+  --err-soft: rgba(237, 107, 131, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 8px 28px rgba(0,0,0,0.35);
+
+  --scrollbar-thumb: #3a344b;
+  --scrollbar-thumb-hover: #4a425e;
+
+  --checkbox-tick: #11101a;
+
+  /* Sidebar */
+  --sidebar-bg: #15131f;
+  --sidebar-active-bg: rgba(155, 123, 234, 0.14);
+  --sidebar-active-text: #b093f0;
+  --sidebar-text: #eeeaf7;
+  --sidebar-text-dim: #aaa3bd;
+  --sidebar-hover-bg: #1e1b29;
+  --sidebar-title-text: #80768f;
+}
+
+
+/* ================================================================
+   THEME: FOREST
+   Calm / Natural / Dark Green
+   ================================================================ */
+
+[data-theme="forest"] {
+  --btn-primary-text: #102017;
+  --btn-primary-bg: #65b891;
+  --btn-primary-bg-hover: #82c8a6;
+
+  --console-bg: #0c120f;
+  --console-text: #b6cfc0;
+
+  --bg: #111714;
+  --panel: #18201b;
+  --panel-raised: #1e2922;
+
+  --line: #2c3930;
+  --line-soft: #222d26;
+
+  --text: #e5eee8;
+  --text-dim: #98aa9e;
+  --text-faint: #607267;
+
+  --accent: #65b891;
+  --accent-dim: #82c8a6;
+  --accent-soft: rgba(101, 184, 145, 0.13);
+
+  --ok: #73d69b;
+  --ok-soft: rgba(115, 214, 155, 0.12);
+
+  --err: #e46d6d;
+  --err-soft: rgba(228, 109, 109, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 7px 25px rgba(0,0,0,0.34);
+
+  --scrollbar-thumb: #344239;
+  --scrollbar-thumb-hover: #435348;
+
+  --checkbox-tick: #111714;
+
+  /* Sidebar */
+  --sidebar-bg: #131b17;
+  --sidebar-active-bg: rgba(101, 184, 145, 0.13);
+  --sidebar-active-text: #82c8a6;
+  --sidebar-text: #e5eee8;
+  --sidebar-text-dim: #98aa9e;
+  --sidebar-hover-bg: #1b251f;
+  --sidebar-title-text: #718378;
+}
+
+
+/* ================================================================
+   THEME: ARCTIC
+   Clean / Modern Light / Blue Gray
+   ================================================================ */
+
+[data-theme="arctic"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #3d8db8;
+  --btn-primary-bg-hover: #55a5d0;
+
+  --console-bg: #e8eef2;
+  --console-text: #34424d;
+
+  --bg: #f3f6f8;
+  --panel: #ffffff;
+  --panel-raised: #edf2f5;
+
+  --line: #d9e1e7;
+  --line-soft: #e5ebef;
+
+  --text: #1d2730;
+  --text-dim: #63717c;
+  --text-faint: #96a3ad;
+
+  --accent: #3d8db8;
+  --accent-dim: #55a5d0;
+  --accent-soft: rgba(61, 141, 184, 0.12);
+
+  --ok: #32a66a;
+  --ok-soft: rgba(50, 166, 106, 0.12);
+
+  --err: #d85b63;
+  --err-soft: rgba(216, 91, 99, 0.10);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.9) inset,
+    0 4px 16px rgba(40,60,75,0.08);
+
+  --scrollbar-thumb: #c4cfd7;
+  --scrollbar-thumb-hover: #aebbc5;
+
+  --checkbox-tick: #ffffff;
+
+  /* Sidebar */
+  --sidebar-bg: #202a33;
+  --sidebar-active-bg: #5aa7c9;
+  --sidebar-active-text: #ffffff;
+  --sidebar-text: #eef3f6;
+  --sidebar-text-dim: #aebbc5;
+  --sidebar-hover-bg: #2b3741;
+  --sidebar-title-text: #9aabb7;
+}
+
+
+/* ================================================================
+   THEME: BURGUNDY
+   Elegant / Premium / Dark Red
+   ================================================================ */
+
+[data-theme="burgundy"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #c66b7a;
+  --btn-primary-bg-hover: #da8290;
+
+  --console-bg: #110c0e;
+  --console-text: #cdb7bd;
+
+  --bg: #171113;
+  --panel: #201719;
+  --panel-raised: #281d20;
+
+  --line: #3a292d;
+  --line-soft: #2c2225;
+
+  --text: #f0e7e9;
+  --text-dim: #ae989e;
+  --text-faint: #766269;
+
+  --accent: #c66b7a;
+  --accent-dim: #da8290;
+  --accent-soft: rgba(198, 107, 122, 0.13);
+
+  --ok: #63c294;
+  --ok-soft: rgba(99, 194, 148, 0.12);
+
+  --err: #e56b6b;
+  --err-soft: rgba(229, 107, 107, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 8px 28px rgba(0,0,0,0.38);
+
+  --scrollbar-thumb: #443238;
+  --scrollbar-thumb-hover: #574047;
+
+  --checkbox-tick: #171113;
+
+  /* Sidebar */
+  --sidebar-bg: #1d1518;
+  --sidebar-active-bg: rgba(198, 107, 122, 0.14);
+  --sidebar-active-text: #da8290;
+  --sidebar-text: #f0e7e9;
+  --sidebar-text-dim: #ae989e;
+  --sidebar-hover-bg: #271d20;
+  --sidebar-title-text: #826c72;
+}
+
+
+/* ================================================================
+   THEME: ESPRESSO
+   Warm Dark / Cozy / Amber
+   ================================================================ */
+
+[data-theme="espresso"] {
+  --btn-primary-text: #21170f;
+  --btn-primary-bg: #d08a45;
+  --btn-primary-bg-hover: #e3a263;
+
+  --console-bg: #100c09;
+  --console-text: #cbb8a5;
+
+  --bg: #171310;
+  --panel: #211b16;
+  --panel-raised: #292119;
+
+  --line: #3a3027;
+  --line-soft: #2c251f;
+
+  --text: #f0e7dc;
+  --text-dim: #aa9987;
+  --text-faint: #756759;
+
+  --accent: #d08a45;
+  --accent-dim: #e3a263;
+  --accent-soft: rgba(208, 138, 69, 0.13);
+
+  --ok: #6fbd7e;
+  --ok-soft: rgba(111, 189, 126, 0.12);
+
+  --err: #df6860;
+  --err-soft: rgba(223, 104, 96, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 7px 26px rgba(0,0,0,0.40);
+
+  --scrollbar-thumb: #44372c;
+  --scrollbar-thumb-hover: #564638;
+
+  --checkbox-tick: #171310;
+
+  /* Sidebar */
+  --sidebar-bg: #19130f;
+  --sidebar-active-bg: rgba(208, 138, 69, 0.14);
+  --sidebar-active-text: #e3a263;
+  --sidebar-text: #f0e7dc;
+  --sidebar-text-dim: #aa9987;
+  --sidebar-hover-bg: #251e18;
+  --sidebar-title-text: #816f5e;
+}
+
+
+/* ================================================================
+   THEME: COBALT
+   Tech / Energetic Blue
+   ================================================================ */
+
+[data-theme="cobalt"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #4c8dff;
+  --btn-primary-bg-hover: #6ca3ff;
+
+  --console-bg: #080d18;
+  --console-text: #afc6eb;
+
+  --bg: #0b1220;
+  --panel: #111c30;
+  --panel-raised: #18263d;
+
+  --line: #263956;
+  --line-soft: #1b2a43;
+
+  --text: #e5efff;
+  --text-dim: #8ba4c7;
+  --text-faint: #536b8e;
+
+  --accent: #4c8dff;
+  --accent-dim: #6ca3ff;
+  --accent-soft: rgba(76, 141, 255, 0.14);
+
+  --ok: #4fd1a5;
+  --ok-soft: rgba(79, 209, 165, 0.12);
+
+  --err: #ef6262;
+  --err-soft: rgba(239, 98, 98, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 8px 30px rgba(0,0,0,0.42);
+
+  --scrollbar-thumb: #30496c;
+  --scrollbar-thumb-hover: #3d5c86;
+
+  --checkbox-tick: #0b1220;
+
+  /* Sidebar */
+  --sidebar-bg: #0e1728;
+  --sidebar-active-bg: rgba(76, 141, 255, 0.14);
+  --sidebar-active-text: #6ca3ff;
+  --sidebar-text: #e5efff;
+  --sidebar-text-dim: #8ba4c7;
+  --sidebar-hover-bg: #162238;
+  --sidebar-title-text: #627da5;
+}
+
+
+/* ================================================================
+   THEME: ROSE DARK
+   Soft / Modern / Pink Accent
+   ================================================================ */
+
+[data-theme="rose"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #d982a8;
+  --btn-primary-bg-hover: #e59aba;
+
+  --console-bg: #0f0b0f;
+  --console-text: #c9b8c5;
+
+  --bg: #151215;
+  --panel: #1d191e;
+  --panel-raised: #252026;
+
+  --line: #342d35;
+  --line-soft: #29232a;
+
+  --text: #f1eaf0;
+  --text-dim: #aa9eaa;
+  --text-faint: #726875;
+
+  --accent: #d982a8;
+  --accent-dim: #e59aba;
+  --accent-soft: rgba(217, 130, 168, 0.13);
+
+  --ok: #65c89b;
+  --ok-soft: rgba(101, 200, 155, 0.12);
+
+  --err: #e46b78;
+  --err-soft: rgba(228, 107, 120, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 8px 28px rgba(0,0,0,0.36);
+
+  --scrollbar-thumb: #42363f;
+  --scrollbar-thumb-hover: #55454f;
+
+  --checkbox-tick: #151215;
+
+  /* Sidebar */
+  --sidebar-bg: #181318;
+  --sidebar-active-bg: rgba(217, 130, 168, 0.14);
+  --sidebar-active-text: #e59aba;
+  --sidebar-text: #f1eaf0;
+  --sidebar-text-dim: #aa9eaa;
+  --sidebar-hover-bg: #241d24;
+  --sidebar-title-text: #806f7b;
+}
+
+
+/* ================================================================
+   THEME: VIOLET NEON
+   Bold / Modern / High Contrast
+   ================================================================ */
+
+[data-theme="violet"] {
+  --btn-primary-text: #ffffff;
+  --btn-primary-bg: #a855f7;
+  --btn-primary-bg-hover: #c084fc;
+
+  --console-bg: #090711;
+  --console-text: #c6b6dd;
+
+  --bg: #0e0b16;
+  --panel: #171321;
+  --panel-raised: #201a2d;
+
+  --line: #302740;
+  --line-soft: #241d31;
+
+  --text: #f0ebfa;
+  --text-dim: #a79dbb;
+  --text-faint: #6d637e;
+
+  --accent: #a855f7;
+  --accent-dim: #c084fc;
+  --accent-soft: rgba(168, 85, 247, 0.15);
+
+  --ok: #4ade80;
+  --ok-soft: rgba(74, 222, 128, 0.12);
+
+  --err: #fb7185;
+  --err-soft: rgba(251, 113, 133, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 8px 30px rgba(0,0,0,0.42);
+
+  --scrollbar-thumb: #3d3150;
+  --scrollbar-thumb-hover: #514064;
+
+  --checkbox-tick: #0e0b16;
+
+  /* Sidebar */
+  --sidebar-bg: #120e1b;
+  --sidebar-active-bg: rgba(168, 85, 247, 0.16);
+  --sidebar-active-text: #c084fc;
+  --sidebar-text: #f0ebfa;
+  --sidebar-text-dim: #a79dbb;
+  --sidebar-hover-bg: #1d1728;
+  --sidebar-title-text: #7c6c91;
+}
+
+
+/* ================================================================
+   THEME: SLATE
+   Minimal / Neutral / Professional
+   ================================================================ */
+
+[data-theme="slate"] {
+  --btn-primary-text: #222222;
+  --btn-primary-bg: #8296aa;
+  --btn-primary-bg-hover: #9cafc1;
+
+  --console-bg: #101419;
+  --console-text: #b7c1ca;
+
+  --bg: #15191e;
+  --panel: #1c2127;
+  --panel-raised: #232930;
+
+  --line: #303840;
+  --line-soft: #252c32;
+
+  --text: #e7ebef;
+  --text-dim: #9ca6b0;
+  --text-faint: #68737e;
+
+  --accent: #8296aa;
+  --accent-dim: #9cafc1;
+  --accent-soft: rgba(130, 150, 170, 0.13);
+
+  --ok: #65c58d;
+  --ok-soft: rgba(101, 197, 141, 0.12);
+
+  --err: #e36b6b;
+  --err-soft: rgba(227, 107, 107, 0.12);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.025) inset,
+    0 7px 25px rgba(0,0,0,0.36);
+
+  --scrollbar-thumb: #3b444d;
+  --scrollbar-thumb-hover: #4b565f;
+
+  --checkbox-tick: #15191e;
+
+  /* Sidebar */
+  --sidebar-bg: #171c21;
+  --sidebar-active-bg: rgba(130, 150, 170, 0.14);
+  --sidebar-active-text: #9cafc1;
+  --sidebar-text: #e7ebef;
+  --sidebar-text-dim: #9ca6b0;
+  --sidebar-hover-bg: #20262c;
+  --sidebar-title-text: #707c87;
+}
+
+:root {
   --radius: 10px;
   --radius-sm: 6px;
-
   --font-ui: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --base-font-size: 14px;
+}
 
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.28);
+/* ── Font size scale ── */
+[data-fontsize="small"]  { --base-font-size: 12px; }
+[data-fontsize="medium"] { --base-font-size: 14px; }
+[data-fontsize="large"]  { --base-font-size: 16px; }
+[data-fontsize="xlarge"] { --base-font-size: 18px; }
+
+/* ── Theme Switcher UI ── */
+.theme-panel {
+  padding: 12px 10px 10px;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 8px;
+}
+
+.theme-panel-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.theme-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.theme-swatch {
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+  transition: transform 0.12s, border-color 0.12s;
+  position: relative;
+  overflow: hidden; /* Dışa taşan SVG kesiliyor */
+  background: var(--line-soft); /* SVG yüklenene kadar yedek arkaplan */
+}
+.theme-swatch:hover { transform: scale(1.12); }
+.theme-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-swatch-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 100;
+}
+.theme-swatch:hover .theme-swatch-tip { opacity: 1; }
+
+.font-size-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.font-size-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.font-size-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+  color: var(--text-dim);
+  width: 26px;
+  height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  padding: 0;
+}
+.font-size-btn:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.font-size-display {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 28px;
+  text-align: center;
+  font-family: var(--font-mono);
 }
 
 * {
@@ -43,9 +1006,10 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--base-font-size, 14px);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  transition: background 0.2s, color 0.2s;
 }
 
 a { color: var(--accent); }
@@ -53,10 +1017,10 @@ a { color: var(--accent); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #3a3e48;
+  background: var(--scrollbar-thumb, #3a3e48);
   border-radius: 6px;
 }
-::-webkit-scrollbar-thumb:hover { background: #494e5a; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover, #494e5a); }
 
 /* ---------------------------------------------------------------------- */
 /* App shell                                                              */
@@ -65,18 +1029,48 @@ a { color: var(--accent); }
 .app {
   display: grid;
   grid-template-columns: 248px 1fr;
+  transform-origin: top left;
   height: 100vh;
+  width: 100vw;
 }
 
 /* Sidebar ---------------------------------------------------------------- */
 
 .sidebar {
-  background: var(--panel);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--line);
+  color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
   padding: 18px 12px;
   overflow-y: auto;
+}
+
+.sidebar .brand-title, 
+.sidebar .brand-sub {
+  color: var(--sidebar-text);
+}
+
+.sidebar .nav-group-label {
+  color: var(--sidebar-title-text);
+}
+
+.sidebar .nav-item {
+  color: var(--sidebar-text-dim);
+}
+
+.sidebar .nav-item:hover {
+  background: var(--sidebar-hover-bg);
+  color: var(--sidebar-text);
+}
+
+.sidebar .nav-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text); /* Her temada accent üzerinde okunabilen renk */
+}
+
+.sidebar .nav-icon {
+  opacity: 1; 
 }
 
 .brand {
@@ -117,6 +1111,7 @@ a { color: var(--accent); }
   letter-spacing: 0.07em;
   color: var(--text-faint);
   padding: 14px 10px 6px;
+  font-weight: 700;
 }
 
 .nav-item {
@@ -169,7 +1164,9 @@ a { color: var(--accent); }
 .view {
   display: none;
   padding: 32px 40px 60px;
-  max-width: 880px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .view.active {
   display: block;
@@ -261,7 +1258,7 @@ textarea.settings-box {
   resize: vertical;
   background: var(--panel-raised);
   border: 1px solid var(--line);
-  color: #c7c9cf;
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: 12.2px;
   line-height: 1.6;
@@ -290,17 +1287,22 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   gap: 7px;
   white-space: nowrap;
 }
-.btn:hover { border-color: #4a4f5c; background: #262a33; }
+.btn:hover { 
+  border-color: var(--text-dim); 
+  background: var(--line-soft); 
+}
 .btn:active { transform: translateY(1px); }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1c1304;
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text, #fff);
   font-weight: 650;
 }
-.btn-primary:hover { background: #f0ad4c; border-color: #f0ad4c; }
-
+.btn-primary:hover { 
+  background: var(--btn-primary-bg-hover); 
+  border-color: var(--btn-primary-bg-hover); 
+}
 .btn-primary:disabled,
 .btn:disabled {
   opacity: 0.5;
@@ -348,7 +1350,7 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   left: 3px;
   top: 3px;
   border-radius: 50%;
-  background: #cfd1d6;
+  background: var(--bg);
   transition: transform 0.15s, background 0.15s;
 }
 .switch input:checked + .switch-track {
@@ -356,12 +1358,16 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
 }
 .switch input:checked + .switch-track::after {
   transform: translateX(16px);
-  background: #fff4e2;
+  background: var(--bg);
 }
 
 /* Dropzone --------------------------------------------------------------------- */
 
 .dropzone {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   border: 1.5px dashed var(--line);
   border-radius: var(--radius);
   background: var(--panel-raised);
@@ -518,7 +1524,7 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
 /* Console / log ------------------------------------------------------------------- */
 
 .console {
-  background: #0e1014;
+  background: var(--console-bg, #0e1014);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   margin-top: 4px;
@@ -586,7 +1592,7 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   overflow-y: auto;
   white-space: pre-wrap;
 }
-.console-line { color: #c7c9cf; }
+.console-line { color: var(--console-text, #c7c9cf); }
 .console-line.ok { color: var(--ok); }
 .console-line.warn { color: #e3c25e; }
 .console-line.error { color: var(--err); }
@@ -857,9 +1863,9 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
 /* ---------------------------------------------------------------------- */
 
 .settings-card {
-  background: var(--panel-raised);
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   margin-bottom: 12px;
   overflow: hidden;
 }
@@ -869,13 +1875,13 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 16px 24px;
   background: var(--panel);
   border-bottom: 1px solid var(--line-soft);
   cursor: pointer;
   user-select: none;
 }
-.settings-card-head:hover { background: #1f2229; }
+.settings-card-head:hover { background: var(--panel-raised); }
 
 .settings-card-title {
   font-family: var(--font-mono);
@@ -900,6 +1906,7 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
 }
 
 .settings-card-body {
+  
   padding: 12px 14px;
 }
 .settings-card.collapsed .settings-card-body {
@@ -925,4 +1932,383 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   justify-content: flex-end;
   gap: 8px;
   margin-top: 10px;
+}
+/* ---------------------------------------------------------------------- */
+/* Settings Tabs (Pills)                                                  */
+/* ---------------------------------------------------------------------- */
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 14px;
+  overflow-x: auto;
+}
+
+.settings-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.settings-tab-btn:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.settings-tab-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings-tab-pane {
+  display: none;
+  animation: fadeIn 0.2s ease;
+}
+
+.settings-tab-pane.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* Responsive                                                             */
+/* ---------------------------------------------------------------------- */
+
+/* Settings view header: stack the title and the action button on narrow
+   widths so the "Open Settings Folder" button never gets clipped. */
+.view-header--settings {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.view-header--settings .btn {
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+
+.hamburger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 60;
+  transition: transform 0.22s ease;
+}
+.hamburger-btn.open {
+  transform: translateX(200px);
+}
+.hamburger-btn svg { 
+  position: absolute;
+  width: 20px; 
+  height: 20px; 
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.hamburger-btn .icon-arrow {
+  opacity: 0;
+  transform: rotate(90deg);
+}
+
+.hamburger-btn.open .icon-menu {
+  opacity: 0;
+  transform: rotate(-90deg);
+}
+
+.hamburger-btn.open .icon-arrow {
+  opacity: 1;
+  transform: rotate(0deg);
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+/* Below the breakpoint the sidebar collapses into a hamburger menu
+   (handled by the @media (max-width: 768px) block further down). */
+
+/* ---------------------------------------------------------------------- */
+/* Wide screens: once the window is wide enough, let the content grow      */
+/* vertically too (so cards don't look long and thin) and bump fonts a     */
+/* little. Below this width everything stays at the comfortable default.   */
+/* ---------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  .app {
+    grid-template-columns: 300px 1fr;
+  }
+
+  .view {
+    padding: 40px 56px 72px;
+  }
+
+  .view-title {
+    font-size: 26px;
+  }
+  .view-desc {
+    font-size: 15px;
+    max-width: 760px;
+  }
+
+  .card {
+    padding: 30px 34px;
+    margin-bottom: 22px;
+  }
+  .card-title {
+    font-size: 14.5px;
+    margin-bottom: 18px;
+  }
+
+  textarea.settings-box {
+    min-height: 260px;
+    font-size: 13.5px;
+  }
+
+  .dropzone {
+    min-height: 220px;
+    padding: 40px;
+  }
+
+  .nav-item {
+    font-size: 14.5px;
+    padding: 11px 13px;
+  }
+
+  .console-body {
+    font-size: 13.5px;
+    max-height: 320px;
+  }
+
+  .btn {
+    font-size: 13.5px;
+    padding: 10px 18px;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Narrow screens: collapse the sidebar into a hamburger menu.             */
+/* ---------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Hamburger button (hidden on wide screens) */
+  .hamburger-btn {
+    display: flex;
+  }
+
+  /* Sidebar becomes an off-canvas panel sliding from the left */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    border-right: 1px solid var(--line);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Dim the content when the menu is open */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .sidebar-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .main {
+    grid-column: 1;
+  }
+
+  .view {
+    padding: 64px 18px 48px;
+  }
+
+  .row-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .view-header--settings {
+    flex-direction: column;
+  }
+  .view-header--settings .btn {
+    width: 100%;
+  }
+}
+.file-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.file-list-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-sm {
+  appearance: none;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-sm:hover {
+  background: var(--line-soft);
+  border-color: var(--text-faint);
+}
+
+.btn-sm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-sm.danger:hover:not(:disabled) {
+  background: var(--err-soft);
+  color: var(--err);
+  border-color: rgba(232,97,95,0.4);
+}
+
+.file-chip-checkbox,
+.file-list-toolbar .select-all {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex-shrink: 0;
+  background: var(--panel-raised); /* İşaretli değilken arkaplanla uyumlu karanlık renk */
+  border: 1px solid var(--text-faint);
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+/* Hover durumunda sınırları hafif belirginleştir */
+.file-chip-checkbox:hover,
+.file-list-toolbar .select-all:hover {
+  border-color: var(--text-dim);
+}
+
+/* İşaretlendiğinde (Checked) temanın ana accent rengini al */
+.file-chip-checkbox:checked,
+.file-list-toolbar .select-all:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* İşaretlendiğinde CSS ile vektörel bir tik (✓) çiz */
+.file-chip-checkbox:checked::after,
+.file-list-toolbar .select-all:checked::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 8px;
+  border: solid var(--checkbox-tick, #15171c);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+/* 
+   Sadece dosya (file-chip) checkbox'larına özel görünürlük mantığı:
+   Layout kaymasını önlemek için boyutu korunur, sadece şeffaf yapılır.
+*/
+.file-chip .file-chip-checkbox {
+  opacity: 0;
+  pointer-events: none; /* Görünmezken tıklanmayı engelle */
+}
+
+/* Dosyanın üstüne gelindiğinde VEYA zaten işaretliyse checkbox'ı göster */
+.file-chip:hover .file-chip-checkbox,
+.file-chip .file-chip-checkbox:checked {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.file-chips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-danger {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: #d44d4b;
+  border-color: #d44d4b;
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.anim-pop {
+  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

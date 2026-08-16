@@ -1,11 +1,428 @@
 /* =========================================================================
    Operations Toolkit — frontend logic
-   Talks to Python through window.pywebview.api (see app.py)
    ========================================================================= */
 
-// ---------------------------------------------------------------------
-// Wait for pywebview to be ready (it injects window.pywebview asynchronously)
-// ---------------------------------------------------------------------
+// =======================================================================
+// TEMA & FONT BOYUTU YÖNETİMİ
+// =======================================================================
+const FONT_SIZES = [12, 13, 14, 15, 16, 17, 18];
+const DEFAULT_FONT = 14;
+const DEFAULT_THEME = "daylight";
+const THEMES = [
+  { id: "daylight", name: "Light" },
+  { id: "daylight-soft", name: "Light Soft" },
+  { id: "graphite", name: "Graphite" },
+  { id: "ocean", name: "Ocean" },
+  { id: "special", name: "Special" },
+  { id: "warm", name: "Warm" },
+
+  { id: "midnight", name: "Midnight Purple" },
+  { id: "carbon", name: "Carbon" },
+  { id: "forest", name: "Forest" },
+  { id: "arctic", name: "Arctic" },
+  { id: "burgundy", name: "Burgundy" },
+  { id: "espresso", name: "Espresso" },
+  { id: "cobalt", name: "Cobalt" },
+  { id: "rose", name: "Rose Dark" },
+  { id: "violet", name: "Violet Neon" },
+  { id: "slate", name: "Slate" }
+];
+
+const htmlEl = document.documentElement;
+function parseMarkdown(text) {
+  if (!text) return "";
+  let html = text
+    // Güvenlik için HTML karakterlerini escape et
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Başlıklar (# , ## , ### )
+    .replace(/^### (.*$)/gim, '<h3 style="margin: 12px 0 6px; font-size: 15px; color: var(--text);">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 style="margin: 14px 0 6px; font-size: 17px; color: var(--text);">$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1 style="margin: 16px 0 8px; font-size: 19px; color: var(--text);">$1</h1>')
+    // Kalın Metin (**text**)
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text);">$1</strong>')
+    // İtalik Metin (*text*)
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    // Listeler (- veya *)
+    .replace(/^\s*[-*]\s+(.*)$/gim, '<li style="margin-bottom: 4px;">$1</li>')
+    // Satır Sonları
+    .replace(/\n/g, '<br>');
+
+  // Alt alta gelen <li> etiketlerini <ul> içine alarak düzgün liste görünümü sağla
+  html = html.replace(/(<li[\s\S]*?<\/li>)+/g, '<ul style="margin: 6px 0 12px 20px; padding: 0;">$&</ul>');
+  return html;
+}
+// =======================================================================
+// EVRENSEL JSON AYAR EDİTÖRÜ (Universal Config Editor)
+// =======================================================================
+class JSONConfigEditor {
+  constructor(containerId, fileName, configSchema) {
+    this.containerId = containerId;
+    this.fileName = fileName;
+    this.configSchema = configSchema; 
+    // configSchema Formatı: [{ key: "columns", title: "Sütunlar", type: "tags" }, { key: "deposits", title: "Maliyetler", type: "key-value" }]
+    this.data = {};
+  }
+
+  async load() {
+    try {
+      const raw = await api().get_settings(this.fileName);
+      this.data = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch (e) {
+      this.data = {};
+    }
+    
+    // JSON'da eksik anahtar varsa otomatik oluştur
+    this.configSchema.forEach(sec => {
+      if (!this.data[sec.key]) this.data[sec.key] = {};
+    });
+    this.render();
+  }
+
+  render() {
+    const container = document.getElementById(this.containerId);
+    if (!container) return;
+
+    let html = ``;
+
+    this.configSchema.forEach(sec => {
+      html += `<div class="card-title" style="margin-bottom:14px;">${sec.title}</div>`;
+      
+      if (sec.type === "tags") {
+        html += `<div class="row-2">`;
+        for (const [colName, valArray] of Object.entries(this.data[sec.key])) {
+          let chips = (valArray || []).map(v => `<span class="file-chip" style="margin:2px; padding:3px 6px; border-color:var(--accent);"><span class="file-chip-name">${v}</span><span class="file-chip-remove" data-sec="${sec.key}" data-col="${colName}" data-val="${v}" style="margin-left:4px;">&times;</span></span>`).join('');
+          html += `
+            <div class="field">
+              <label class="field-label">${colName.toUpperCase()}</label>
+              <div class="tags-wrapper" style="display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--panel-raised); border:1px solid var(--line); border-radius:var(--radius-sm); min-height:36px; align-items:center;">
+                ${chips}
+                <input type="text" class="tag-input" data-sec="${sec.key}" data-col="${colName}" style="border:none; background:transparent; outline:none; color:var(--text); flex:1; min-width:80px; font-size:12px;" placeholder="Add and press Enter..." />
+              </div>
+            </div>`;
+        }
+        html += `</div>`;
+      } else if (sec.type === "key-value") {
+        html += `<div class="row-2" style="margin-bottom:14px;">`;
+        for (const [k, v] of Object.entries(this.data[sec.key])) {
+          html += `
+            <div class="field anim-pop" style="background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: auto;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="field-label" style="margin-bottom: 0; font-weight: 600;">${k}</label>
+                <button class="btn-delete-kv" data-sec="${sec.key}" data-key="${k}" style="background: transparent; border:none; color:var(--err); cursor:pointer; font-size:16px; line-height:1; padding: 2px 4px;" title="Sil">&times;</button>
+              </div>
+              <input type="number" step="0.01" class="kv-input text-input" data-sec="${sec.key}" data-key="${k}" value="${v}" />
+            </div>`;
+        }
+        html += `</div>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" class="text-input new-kv-key" data-sec="${sec.key}" placeholder="New Warehouse" style="width:160px; font-size:12.8px; padding:6px 11px;" />
+          <button class="btn btn-primary btn-add-kv" data-sec="${sec.key}" style="padding:6px 14px;">Add</button>
+        </div><div class="divider"></div>`;
+      }
+    });
+    html += `
+    <div style="display:flex; justify-content:flex-end; align-items:center;">
+      <div style="display:flex;">
+        <button class="btn btn-sm btn-revert" style="padding:6px 14px; margin-right:8px;" title="Unsaved changes will be lost">Revert</button>
+        <button class="btn btn-sm btn-save" style="padding:6px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
+      </div>
+    </div>`;
+    
+
+    container.innerHTML = html;
+    this.attachEvents(container);
+  }
+
+  attachEvents(container) {
+    container.querySelectorAll(".tag-input").forEach(input => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const val = e.target.value.trim();
+          const sec = e.target.dataset.sec;
+          const col = e.target.dataset.col;
+          if (val && !this.data[sec][col].includes(val)) {
+            this.data[sec][col].push(val);
+            this.render();
+          }
+        }
+      });
+    });
+
+    container.querySelectorAll(".file-chip-remove").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const sec = e.currentTarget.dataset.sec;
+        const col = e.currentTarget.dataset.col;
+        const val = e.currentTarget.dataset.val;
+        this.data[sec][col] = this.data[sec][col].filter(v => v !== val);
+        this.render();
+      });
+    });
+
+    container.querySelectorAll(".kv-input").forEach(input => {
+      input.addEventListener("change", (e) => {
+        const sec = e.target.dataset.sec;
+        const key = e.target.dataset.key;
+        this.data[sec][key] = parseFloat(e.target.value) || 0;
+      });
+    });
+
+    container.querySelectorAll(".btn-delete-kv").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const sec = e.currentTarget.dataset.sec;
+        const key = e.currentTarget.dataset.key;
+        if (e.currentTarget.dataset.confirm === "1") {
+          delete this.data[sec][key];
+          this.render();
+        } else {
+          e.currentTarget.dataset.confirm = "1";
+          e.currentTarget.innerHTML = "Delete?";
+          e.currentTarget.style.fontSize = "11px";
+          e.currentTarget.style.backgroundColor = "var(--err)";
+          e.currentTarget.style.color = "#fff";
+          e.currentTarget.style.padding = "6px 8px";
+          e.currentTarget.style.borderRadius = "4px";
+          e.currentTarget.style.top = "6px";
+          e.currentTarget.style.right = "6px";
+          setTimeout(() => {
+            if (document.body.contains(e.currentTarget)) {
+              e.currentTarget.dataset.confirm = "0";
+              e.currentTarget.innerHTML = "&times;";
+              e.currentTarget.style = "background:transparent; border:none; color:var(--err); cursor:pointer; float:right; font-size:16px; line-height:1;";
+            }
+          }, 3000);
+        }
+      });
+    });
+
+    container.querySelectorAll(".btn-add-kv").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const sec = e.currentTarget.dataset.sec;
+        const input = container.querySelector(`.new-kv-key[data-sec="${sec}"]`);
+        const newKey = input.value.trim();
+        if (newKey && this.data[sec][newKey] === undefined) {
+          this.data[sec][newKey] = 0;
+          this.render();
+        } else if (newKey) {
+          toast("Bu anahtar zaten mevcut.");
+        }
+      });
+    });
+    container.querySelector(".btn-save").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      await api().save_settings(this.fileName, JSON.stringify(this.data));
+      toast("Ayarlar diske kaydedildi.");
+      btn.disabled = false;
+    });
+
+    container.querySelector(".btn-revert").addEventListener("click", () => {
+      this.load();
+      toast("Değişiklikler geri alındı.");
+    });
+  }
+}
+
+// ── Kayıt / Yükleme ──
+function savePrefs(theme, fontSize) {
+  if (api()) {
+    api().set_memory_value("opkit_theme", theme).then(() => {
+      api().set_memory_value("opkit_font", String(fontSize));
+    });
+  }
+}
+
+function loadPrefs() {
+  try {
+    return {
+      theme: localStorage.getItem("opkit_theme") || DEFAULT_THEME,
+      fontSize: parseInt(localStorage.getItem("opkit_font") || DEFAULT_FONT, 10)
+    };
+  } catch (_) {
+    return { theme: DEFAULT_THEME, fontSize: DEFAULT_FONT };
+  }
+}
+
+// ── Tema Uygulama ──
+function applyTheme(theme) {
+  htmlEl.setAttribute("data-theme", theme);
+  document.querySelectorAll(".theme-swatch").forEach(s => {
+    s.classList.toggle("active", s.dataset.theme === theme);
+  });
+}
+function createThemeSwatches() {
+  const container = document.getElementById("theme-swatches");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  THEMES.forEach(theme => {
+    const swatch = document.createElement("div");
+    swatch.className = "theme-swatch";
+    swatch.dataset.theme = theme.id;
+    swatch.title = theme.name;
+
+    swatch.innerHTML = `
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+          <rect width="100" height="100" fill="var(--bg)" />
+          <rect width="28" height="100" fill="var(--sidebar-bg)" />
+          <!-- Sidebar Aktif Eleman -->
+          <rect x="4" y="24" width="20" height="10" rx="3" fill="var(--sidebar-active-bg)" />
+          <rect x="7" y="28" width="8" height="2" rx="1" fill="var(--sidebar-active-text)" />
+          <rect x="34" y="10" width="60" height="22" rx="3" fill="var(--panel)" />
+          <line x1="38" y1="21" x2="88" y2="21" stroke="var(--line-soft)" stroke-width="0.5" />
+          <!-- Toggle 1 -->
+          <rect x="76" y="13" width="14" height="6" rx="3" fill="var(--accent)" />
+          <circle cx="86" cy="16" r="2.5" fill="var(--panel)" />
+          <!-- Toggle 2 -->
+          <rect x="76" y="23" width="14" height="6" rx="3" fill="var(--accent)" />
+          <circle cx="86" cy="26" r="2.5" fill="var(--panel)" />
+          <rect x="34" y="38" width="60" height="26" rx="3" fill="var(--panel)" />
+          <line x1="37" y1="44" x2="60" y2="44" stroke="var(--line)" stroke-width="1" />
+          <rect x="37" y="47" width="54" height="14" rx="2" fill="var(--panel-raised)" />
+
+          <rect x="34" y="70" width="60" height="26" rx="3" fill="var(--panel)" />
+          <line x1="37" y1="76" x2="60" y2="76" stroke="var(--line)" stroke-width="1" />
+          <rect x="37" y="79" width="54" height="14" rx="2" fill="var(--panel-raised)" />
+        </svg>
+
+        <span class="theme-swatch-tip">${theme.name}</span>
+    `;
+
+    swatch.addEventListener("click", () => {
+        applyTheme(theme.id);
+        savePrefs(theme.id, currentFontSize);
+    });
+
+    container.appendChild(swatch);
+  });
+}
+
+// Reusable Tag Pill Component Builder
+function createTagInput(tagsArray, onChange, placeholder = "+ Add alias...") {
+  const container = document.createElement("div");
+  container.className = "tag-input-container";
+
+  function render() {
+    container.innerHTML = "";
+    tagsArray.forEach((tag, idx) => {
+      const pill = document.createElement("span");
+      pill.className = "tag-pill";
+      pill.innerHTML = `<span>${escapeHtml(tag)}</span><span class="tag-pill-remove" title="Remove alias">&times;</span>`;
+      pill.querySelector(".tag-pill-remove").addEventListener("click", (e) => {
+        e.stopPropagation();
+        tagsArray.splice(idx, 1);
+        render();
+        onChange(tagsArray);
+      });
+      container.appendChild(pill);
+    });
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "tag-input-field";
+    input.placeholder = placeholder;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        const val = input.value.trim().replace(/,/g, "");
+        if (val && !tagsArray.includes(val)) {
+          tagsArray.push(val);
+          render();
+          onChange(tagsArray);
+          setTimeout(() => {
+            const lastInput = container.querySelector(".tag-input-field");
+            if (lastInput) lastInput.focus();
+          }, 10);
+        }
+      }
+    });
+    container.appendChild(input);
+  }
+
+  render();
+  return container;
+}
+
+// ── Font Boyutu Uygulama ──
+let currentFontSize = DEFAULT_FONT;
+function applyFontSize(size) {
+  currentFontSize = Math.max(FONT_SIZES[0], Math.min(size, FONT_SIZES[FONT_SIZES.length - 1]));
+  htmlEl.style.setProperty("--base-font-size", currentFontSize + "px");
+  const display = document.getElementById("font-size-display");
+  if (display) display.textContent = currentFontSize + "px";
+  // Disable buttons at limits
+  const decBtn = document.getElementById("font-decrease-btn");
+  const incBtn = document.getElementById("font-increase-btn");
+  if (decBtn) decBtn.disabled = currentFontSize <= FONT_SIZES[0];
+  if (incBtn) incBtn.disabled = currentFontSize >= FONT_SIZES[FONT_SIZES.length - 1];
+}
+
+// ── İlk Yükleme ──
+createThemeSwatches();
+// ── Font Butonları ──
+// Settings Tabs (Sekme) Mantığı
+document.querySelectorAll(".settings-tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".settings-tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".settings-tab-pane").forEach(p => p.classList.remove("active"));
+    
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.target).classList.add("active");
+  });
+});
+
+// View (Sayfa) geçişlerinde verilerin senkronize edilmesi
+document.querySelectorAll(".nav-item[data-view]").forEach((item) => {
+  item.addEventListener("click", async () => {
+    document.querySelectorAll(".nav-item[data-view]").forEach((i) => i.classList.remove("active"));
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    item.classList.add("active");
+    document.getElementById("view-" + item.dataset.view).classList.add("active");
+    
+    // Geçiş yapılan sayfadaki ayar dosyalarını bellekten tazeleyerek senkron tut
+    if (item.dataset.view === "settings") {
+      loadCostUpdaterSettings();
+      if(typeof mainRestockEditor !== "undefined") mainRestockEditor.load();
+      if(typeof mainOrderEditor !== "undefined") mainOrderEditor.load();
+      if(typeof mainInvoiceEditor !== "undefined") mainInvoiceEditor.load();
+      if(typeof mainShipmentEditor !== "undefined") mainShipmentEditor.load();
+    } else if (item.dataset.view === "restock" && typeof restockEditor !== "undefined") {
+      restockEditor.load();
+    } else if (item.dataset.view === "ordercreate" && typeof orderEditor !== "undefined") {
+      orderEditor.load();
+    } else if (item.dataset.view === "invoice" && typeof invoiceEditor !== "undefined") {
+      invoiceEditor.load();
+    } else if (item.dataset.view === "shipment" && typeof shipmentEditor !== "undefined") {
+      shipmentEditor.load();
+    }
+    
+    closeSidebar();
+  });
+});
+
+const openBtn = document.getElementById("settings-open-folder-btn");
+if (openBtn) openBtn.addEventListener("click", async () => { openBtn.disabled = true; try { await api().open_settings_folder(); } finally { openBtn.disabled = false; } });
+
+document.getElementById("font-increase-btn")?.addEventListener("click", () => {
+  const next = FONT_SIZES.find(s => s > currentFontSize) || currentFontSize;
+  applyFontSize(next);
+  savePrefs(htmlEl.getAttribute("data-theme") || DEFAULT_THEME, currentFontSize);
+});
+
+document.getElementById("font-decrease-btn")?.addEventListener("click", () => {
+  const prev = [...FONT_SIZES].reverse().find(s => s < currentFontSize) || currentFontSize;
+  applyFontSize(prev);
+  savePrefs(htmlEl.getAttribute("data-theme") || DEFAULT_THEME, currentFontSize);
+});
+
+document.getElementById("font-reset-btn")?.addEventListener("click", () => {
+  applyFontSize(DEFAULT_FONT);
+  savePrefs(htmlEl.getAttribute("data-theme") || DEFAULT_THEME, DEFAULT_FONT);
+});
+
 function whenApiReady(cb) {
   if (window.pywebview && window.pywebview.api) {
     cb();
@@ -18,11 +435,6 @@ function api() {
   return window.pywebview ? window.pywebview.api : null;
 }
 
-// ---------------------------------------------------------------------
-// Copy console output to clipboard
-// Every .console has a .console-head; we inject a "Copy" button into each
-// head that copies the text of that console's .console-body.
-// ---------------------------------------------------------------------
 function initConsoleCopyButtons() {
   document.querySelectorAll(".console").forEach((consoleEl) => {
     const head = consoleEl.querySelector(".console-head");
@@ -34,19 +446,13 @@ function initConsoleCopyButtons() {
     btn.textContent = "Copy";
     btn.addEventListener("click", async () => {
       const text = body.innerText.trim();
-      if (!text) {
-        toast("Nothing to copy yet.");
-        return;
-      }
+      if (!text) return toast("Nothing to copy yet.");
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
         } else {
-          // Fallback for non-secure contexts (file://)
           const ta = document.createElement("textarea");
           ta.value = text;
-          ta.style.position = "fixed";
-          ta.style.opacity = "0";
           document.body.appendChild(ta);
           ta.select();
           document.execCommand("copy");
@@ -66,9 +472,6 @@ function initConsoleCopyButtons() {
   });
 }
 
-// ---------------------------------------------------------------------
-// Toast helper
-// ---------------------------------------------------------------------
 function toast(msg) {
   const el = document.getElementById("toast");
   el.textContent = msg;
@@ -80,20 +483,36 @@ function toast(msg) {
 // ---------------------------------------------------------------------
 // Sidebar navigation
 // ---------------------------------------------------------------------
+const sidebarEl = document.querySelector(".sidebar");
+const sidebarOverlay = document.getElementById("sidebar-overlay");
+const hamburgerBtn = document.getElementById("hamburger-btn");
+
+function closeSidebar() {
+  if (sidebarEl) sidebarEl.classList.remove("open");
+  if (sidebarOverlay) sidebarOverlay.classList.remove("open");
+  if (hamburgerBtn) hamburgerBtn.classList.remove("open");
+}
+
+if (hamburgerBtn) {
+  hamburgerBtn.addEventListener("click", () => {
+    if (sidebarEl) sidebarEl.classList.toggle("open");
+    if (sidebarOverlay) sidebarOverlay.classList.toggle("open");
+    hamburgerBtn.classList.toggle("open");
+  });
+}
+
+if (sidebarOverlay) sidebarOverlay.addEventListener("click", closeSidebar);
+
 document.querySelectorAll(".nav-item[data-view]").forEach((item) => {
   item.addEventListener("click", () => {
     document.querySelectorAll(".nav-item[data-view]").forEach((i) => i.classList.remove("active"));
     document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
     item.classList.add("active");
     document.getElementById("view-" + item.dataset.view).classList.add("active");
-    // Reload settings when the user navigates to that view
-    if (item.dataset.view === "settings") settingsEditor.load();
+    closeSidebar();
   });
 });
 
-// ----------------------------------------------------------------
-// Browse-folder buttons (generic, works for any input via data-browse-folder)
-// ---------------------------------------------------------------------
 document.querySelectorAll("[data-browse-folder]").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const inputId = btn.getAttribute("data-browse-folder");
@@ -105,24 +524,26 @@ document.querySelectorAll("[data-browse-folder]").forEach((btn) => {
   });
 });
 
-// Restore remembered path values on load
 whenApiReady(async () => {
   initConsoleCopyButtons();
-
   const mem = await api().get_memory();
+
+  const savedTheme = mem["opkit_theme"] || DEFAULT_THEME;
+  const savedFont = parseInt(mem["opkit_font"] || DEFAULT_FONT, 10);
+  applyTheme(savedTheme);
+  applyFontSize(savedFont);
+
+  if (mem["app_zoom"]) {
+    updateAppZoom(parseFloat(mem["app_zoom"]), false);
+  }
+
   document.querySelectorAll("input[type=text]").forEach((input) => {
     if (mem[input.id] && !input.value) input.value = mem[input.id];
-  });
-  // Persist on manual edits too
-  document.querySelectorAll("input[type=text]").forEach((input) => {
     input.addEventListener("change", () => api().set_memory_value(input.id, input.value));
   });
 
-  // Hide the loading overlay once the page is interactive
   const loadingOverlay = document.getElementById("loading-overlay");
-  const loadingFill = document.getElementById("loading-bar-fill");
   if (loadingOverlay) {
-    if (loadingFill) loadingFill.style.width = "100%";
     setTimeout(() => {
       loadingOverlay.classList.add("loaded");
       setTimeout(() => {
@@ -132,35 +553,10 @@ whenApiReady(async () => {
   }
 });
 
-// =======================================================================
-// LOADING-SCREEN STATUS UPDATES
-// =======================================================================
-// Python pushes these during staged imports (see app.py _set_loading_status).
-// For now the overlay always completes its animation above regardless ---
-// this hook is kept for future progress reporting if imports are refactored.
-window.addEventListener("loading-status", (e) => {
-  const { message, percent } = e.detail;
-  const statusEl = document.getElementById("loading-status");
-  const fillEl = document.getElementById("loading-bar-fill");
-  if (statusEl) statusEl.textContent = message;
-  if (fillEl && typeof percent === "number") fillEl.style.width = percent + "%";
-});
-
 // ---------------------------------------------------------------------
-// Generic dropzone + file list manager
-// Each instance tracks an array of absolute file paths.
-//
-// Real filesystem paths are NOT available through plain browser drag-drop
-// events (browsers hide them for security). pywebview restores this on the
-// Python side via window.dom — see app.py's bind_dropzones() / _handle_drop().
-// Python resolves which .dropzone element received the drop (by id, bound
-// at startup) and fires a 'files-dropped' CustomEvent with {zoneId, paths}.
-// Each FileDropZone instance registers itself here so the right instance
-// picks up the event. Dragover/dragleave styling still works as normal CSS-
-// only feedback since that doesn't need real paths.
+// DYNAMIC FILE DROPZONE (with Selection Toolbar)
 // ---------------------------------------------------------------------
 const dropZoneRegistry = {};
-
 window.addEventListener("files-dropped", (e) => {
   const { zoneId, paths } = e.detail;
   const zone = dropZoneRegistry[zoneId];
@@ -171,28 +567,20 @@ class FileDropZone {
   constructor({ zoneId, listId, fileTypes = null, multiple = true, accept = null, reorderable = false }) {
     this.zone = document.getElementById(zoneId);
     this.list = document.getElementById(listId);
-    this.fileTypes = fileTypes; // for native dialog filter, e.g. ['Excel Files (*.xlsx;*.xls)']
+    this.fileTypes = fileTypes; 
     this.multiple = multiple;
-    this.accept = accept; // function(filename) => bool, for filtering dropped/picked files
-    this.reorderable = reorderable; // enables drag-handle + up/down arrows; order is then meaningful data
+    this.accept = accept; 
+    this.reorderable = reorderable; 
     this.files = [];
+    this.selected = new Set();
     this._dragFromIndex = null;
 
     dropZoneRegistry[zoneId] = this;
 
     this.zone.addEventListener("click", () => this.browse());
-
-    // Visual feedback only — actual file paths arrive via the
-    // 'files-dropped' event dispatched from Python (see above).
-    this.zone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      this.zone.classList.add("drag-over");
-    });
+    this.zone.addEventListener("dragover", (e) => { e.preventDefault(); this.zone.classList.add("drag-over"); });
     this.zone.addEventListener("dragleave", () => this.zone.classList.remove("drag-over"));
-    this.zone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      this.zone.classList.remove("drag-over");
-    });
+    this.zone.addEventListener("drop", (e) => { e.preventDefault(); this.zone.classList.remove("drag-over"); });
   }
 
   async browse() {
@@ -203,7 +591,7 @@ class FileDropZone {
   addFiles(paths) {
     for (const p of paths) {
       if (this.accept && !this.accept(p)) continue;
-      if (!this.multiple) this.files = [];
+      if (!this.multiple) { this.files = []; this.selected.clear(); }
       if (!this.files.includes(p)) this.files.push(p);
     }
     this.render();
@@ -211,6 +599,19 @@ class FileDropZone {
 
   removeFile(p) {
     this.files = this.files.filter((f) => f !== p);
+    this.selected.delete(p);
+    this.render();
+  }
+
+  deleteSelected() {
+    this.files = this.files.filter((f) => !this.selected.has(f));
+    this.selected.clear();
+    this.render();
+  }
+
+  clear() {
+    this.files = [];
+    this.selected.clear();
     this.render();
   }
 
@@ -221,16 +622,63 @@ class FileDropZone {
     this.render();
   }
 
-  clear() {
-    this.files = [];
+  toggleAll(checked) {
+    if (checked) {
+      this.files.forEach(f => this.selected.add(f));
+    } else {
+      this.selected.clear();
+    }
     this.render();
   }
 
   render() {
     this.list.innerHTML = "";
+    if (this.files.length === 0) return;
+
+    // Render Toolbar
+    const toolbar = document.createElement("div");
+    toolbar.className = "file-list-toolbar";
+    
+    const allSelected = this.files.length > 0 && this.files.length === this.selected.size;
+    const someSelected = this.selected.size > 0;
+
+    toolbar.innerHTML = `
+      <label><input type="checkbox" class="select-all" ${allSelected ? "checked" : ""}> Select All</label>
+      <div class="toolbar-actions">
+          <button class="btn-sm danger btn-delete-sel" ${someSelected ? "" : "disabled"}>Delete Selected</button>
+          <button class="btn-sm danger btn-clear-all">Clear All</button>
+      </div>
+    `;
+
+    toolbar.querySelector(".select-all").addEventListener("change", (e) => this.toggleAll(e.target.checked));
+    toolbar.querySelector(".btn-delete-sel").addEventListener("click", () => this.deleteSelected());
+    toolbar.querySelector(".btn-clear-all").addEventListener("click", () => this.clear());
+
+    this.list.appendChild(toolbar);
+
+    // Render File Chips
+    const container = document.createElement("div");
+    container.className = "file-chips-container";
+    
     this.files.forEach((p, index) => {
       const chip = this.reorderable ? this._renderReorderableChip(p, index) : this._renderChip(p);
-      this.list.appendChild(chip);
+      container.appendChild(chip);
+    });
+
+    this.list.appendChild(container);
+  }
+
+  _getCheckboxHTML(p) {
+    const isChecked = this.selected.has(p) ? "checked" : "";
+    return `<input type="checkbox" class="file-chip-checkbox" data-path="${encodeURIComponent(p)}" ${isChecked}>`;
+  }
+
+  _bindCheckboxEvent(chip) {
+    chip.querySelector(".file-chip-checkbox").addEventListener("change", (e) => {
+      const path = decodeURIComponent(e.target.dataset.path);
+      if (e.target.checked) this.selected.add(path);
+      else this.selected.delete(path);
+      this.render(); // Re-render to update toolbar state
     });
   }
 
@@ -239,11 +687,13 @@ class FileDropZone {
     const chip = document.createElement("div");
     chip.className = "file-chip";
     chip.innerHTML = `
+      ${this._getCheckboxHTML(p)}
       <svg class="file-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z"/><path d="M14 3v5h5"/></svg>
       <span class="file-chip-name" title="${p}">${name}</span>
       <span class="file-chip-remove" data-path="${encodeURIComponent(p)}">&times;</span>`;
+    
+    this._bindCheckboxEvent(chip);
     chip.querySelector(".file-chip-remove").addEventListener("click", (ev) => {
-      ev.stopPropagation();
       this.removeFile(decodeURIComponent(ev.target.dataset.path));
     });
     return chip;
@@ -254,7 +704,6 @@ class FileDropZone {
     const chip = document.createElement("div");
     chip.className = "file-chip reorderable";
     chip.draggable = true;
-    chip.dataset.index = String(index);
 
     const isFirst = index === 0;
     const isLast = index === this.files.length - 1;
@@ -263,61 +712,39 @@ class FileDropZone {
       <span class="file-chip-handle" title="Drag to reorder">
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="6" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>
       </span>
+      ${this._getCheckboxHTML(p)}
       <span class="file-chip-rank">${index + 1}</span>
-      <svg class="file-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z"/><path d="M14 3v5h5"/></svg>
       <span class="file-chip-name" title="${p}">${name}</span>
       <span class="file-chip-arrows">
-        <span class="file-chip-arrow ${isFirst ? "disabled" : ""}" data-dir="up" title="Move up">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 15l7-7 7 7"/></svg>
-        </span>
-        <span class="file-chip-arrow ${isLast ? "disabled" : ""}" data-dir="down" title="Move down">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 9l7 7 7-7"/></svg>
-        </span>
+        <span class="file-chip-arrow ${isFirst ? "disabled" : ""}" data-dir="up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 15l7-7 7 7"/></svg></span>
+        <span class="file-chip-arrow ${isLast ? "disabled" : ""}" data-dir="down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 9l7 7 7-7"/></svg></span>
       </span>
       <span class="file-chip-remove" data-path="${encodeURIComponent(p)}">&times;</span>`;
 
-    chip.querySelector(".file-chip-remove").addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      this.removeFile(decodeURIComponent(ev.target.dataset.path));
-    });
-    chip.querySelectorAll(".file-chip-arrow").forEach((arrowEl) => {
-      arrowEl.addEventListener("click", (ev) => {
+    this._bindCheckboxEvent(chip);
+    chip.querySelector(".file-chip-remove").addEventListener("click", (ev) => this.removeFile(decodeURIComponent(ev.target.dataset.path)));
+    chip.querySelectorAll(".file-chip-arrow").forEach((el) => {
+      el.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        const dir = ev.currentTarget.dataset.dir;
-        this.moveFile(index, dir === "up" ? index - 1 : index + 1);
+        this.moveFile(index, ev.currentTarget.dataset.dir === "up" ? index - 1 : index + 1);
       });
     });
 
-    chip.addEventListener("dragstart", (ev) => {
-      this._dragFromIndex = index;
-      chip.classList.add("dragging");
-      ev.dataTransfer.effectAllowed = "move";
-      ev.dataTransfer.setData("text/plain", String(index)); // some browsers require data to be set
-    });
-    chip.addEventListener("dragend", () => {
-      chip.classList.remove("dragging");
-      this.list.querySelectorAll(".file-chip").forEach((c) => {
-        c.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-    });
+    chip.addEventListener("dragstart", (ev) => { this._dragFromIndex = index; chip.classList.add("dragging"); ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(index)); });
+    chip.addEventListener("dragend", () => { chip.classList.remove("dragging"); this.list.querySelectorAll(".file-chip").forEach(c => c.classList.remove("drag-over-top", "drag-over-bottom")); });
     chip.addEventListener("dragover", (ev) => {
       ev.preventDefault();
       if (this._dragFromIndex === null || this._dragFromIndex === index) return;
       const rect = chip.getBoundingClientRect();
-      const before = ev.clientY - rect.top < rect.height / 2;
-      chip.classList.toggle("drag-over-top", before);
-      chip.classList.toggle("drag-over-bottom", !before);
+      chip.classList.toggle("drag-over-top", ev.clientY - rect.top < rect.height / 2);
+      chip.classList.toggle("drag-over-bottom", !(ev.clientY - rect.top < rect.height / 2));
     });
-    chip.addEventListener("dragleave", () => {
-      chip.classList.remove("drag-over-top", "drag-over-bottom");
-    });
+    chip.addEventListener("dragleave", () => chip.classList.remove("drag-over-top", "drag-over-bottom"));
     chip.addEventListener("drop", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation(); // don't let this bubble to the dropzone's OS-file drop handler
+      ev.preventDefault(); ev.stopPropagation();
       if (this._dragFromIndex === null || this._dragFromIndex === index) return;
       const rect = chip.getBoundingClientRect();
-      const before = ev.clientY - rect.top < rect.height / 2;
-      let targetIndex = before ? index : index + 1;
+      let targetIndex = (ev.clientY - rect.top < rect.height / 2) ? index : index + 1;
       if (this._dragFromIndex < targetIndex) targetIndex -= 1;
       this.moveFile(this._dragFromIndex, targetIndex);
       this._dragFromIndex = null;
@@ -328,10 +755,11 @@ class FileDropZone {
 }
 
 // ---------------------------------------------------------------------
-// Console / job-status helpers shared by all tool panels
+// Console & Tool Status Builders
 // ---------------------------------------------------------------------
 function logLine(bodyId, message, cls = "") {
   const body = document.getElementById(bodyId);
+  if(!body) return;
   const line = document.createElement("div");
   line.className = "console-line " + cls;
   line.textContent = message;
@@ -342,102 +770,348 @@ function logLine(bodyId, message, cls = "") {
 function setStatus(dotId, textId, state, label) {
   const dot = document.getElementById(dotId);
   const text = document.getElementById(textId);
-  dot.className = "console-dot " + state;
-  text.textContent = label;
+  if(dot) dot.className = "console-dot " + state;
+  if(text) text.textContent = label;
 }
 
 function showResult(bannerId, ok, message, outputPath) {
   const el = document.getElementById(bannerId);
+  if(!el) return;
   el.className = "result-banner visible " + (ok ? "ok" : "error");
   el.innerHTML = `<span>${message}</span>`;
   if (ok && outputPath) {
-    const openBtn = document.createElement("button");
-    openBtn.className = "btn";
-    openBtn.textContent = "Open folder";
-    openBtn.addEventListener("click", () => api().open_folder(outputPath));
-    el.appendChild(openBtn);
+    const btn = document.createElement("button");
+    btn.className = "btn";
+    btn.textContent = "Open folder";
+    btn.addEventListener("click", () => api().open_folder(outputPath));
+    el.appendChild(btn);
   }
 }
 
-// =======================================================================
-// CONVERTER
-// =======================================================================
-const convZone = new FileDropZone({
-  zoneId: "conv-dropzone",
-  listId: "conv-file-list",
-  fileTypes: ["Convertible Files (*.csv;*.xlsx;*.xls;*.txt)", "All files (*.*)"],
-});
+// ---------------------------------------------------------------------
+// Job Execution Wrapper (DRY Logic for all Tools)
+// ---------------------------------------------------------------------
+const TOOLS = [
+  { btn: "conv-run-btn", cancelBtn: "conv-cancel-btn", log: "conv-log", dot: "conv-dot", status: "conv-status-text", result: "conv-result", fill: "conv-progress-fill", console: "conv-console" },
+  { btn: "tsv-run-btn", cancelBtn: "tsv-cancel-btn", log: "tsv-log", dot: "tsv-dot", status: "tsv-status-text", result: "tsv-result", fill: null, console: "tsv-console" },
+  { btn: "cu-run-btn", cancelBtn: "cu-cancel-btn", log: "cu-log", dot: "cu-dot", status: "cu-status-text", result: "cu-result", fill: null, console: "cu-console" },
+  { btn: "rs-run-btn", cancelBtn: "rs-cancel-btn", log: "rs-log", dot: "rs-dot", status: "rs-status-text", result: "rs-result", fill: "rs-progress-fill", console: "rs-console" },
+  { btn: "fp-run-btn", cancelBtn: "fp-cancel-btn", log: "fp-log", dot: "fp-dot", status: "fp-status-text", result: "fp-result", fill: null, console: "fp-console" },
+  { btn: "oc-run-btn", cancelBtn: "oc-cancel-btn", log: "oc-log", dot: "oc-dot", status: "oc-status-text", result: "oc-result", fill: null, console: "oc-console" },
+  { btn: "inv-run-btn", cancelBtn: "inv-cancel-btn", log: "inv-log", dot: "inv-dot", status: "inv-status-text", result: "inv-result", fill: null, console: "inv-console" },
+  { btn: "sc-run-btn", cancelBtn: "sc-cancel-btn", log: "sc-log", dot: "sc-dot", status: "sc-status-text", result: "sc-result", fill: null, console: "sc-console" },
+  { btn: "if-run-btn", cancelBtn: "if-cancel-btn", log: "if-log", dot: "if-dot", status: "if-status-text", result: "if-result", fill: null, console: "if-console" },
+  { btn: "exp-run-btn", cancelBtn: "exp-cancel-btn", log: "exp-log", dot: "exp-dot", status: "exp-status-text", result: "exp-result", fill: null, console: "exp-console" },
+];
 
-function convExtFor(type) {
-  return { csv: ".csv", xlsx: ".xlsx", txt: ".txt" }[type] || "";
+function activeTool() { return TOOLS.find((t) => document.getElementById(t.btn)?.disabled) || null; }
+
+function prepareJobUI(prefix) {
+  document.getElementById(`${prefix}-console`).classList.add("visible");
+  document.getElementById(`${prefix}-result`).classList.remove("visible");
+  document.getElementById(`${prefix}-log`).innerHTML = "";
+  if(document.getElementById(`${prefix}-progress-fill`)) document.getElementById(`${prefix}-progress-fill`).style.width = "0%";
+  setStatus(`${prefix}-dot`, `${prefix}-status-text`, "running", "Running…");
+  
+  document.getElementById(`${prefix}-run-btn`).disabled = true;
+  const cBtn = document.getElementById(`${prefix}-cancel-btn`);
+  if(cBtn) cBtn.style.display = "inline-flex";
 }
 
-document.getElementById("conv-input-type").addEventListener("change", (e) => {
-  document.getElementById("conv-type-hint").textContent = convExtFor(e.target.value) + " files";
-  convZone.clear();
+// Global Cancel Attachments
+TOOLS.forEach(t => {
+  const cBtn = document.getElementById(t.cancelBtn);
+  if(cBtn) {
+    cBtn.addEventListener("click", async () => {
+      await api().cancel_job();
+      cBtn.disabled = true; // Prevent spamming cancel
+    });
+  }
 });
 
+// Event Listeners for Job Progress
+window.addEventListener("job-log", (e) => {
+  const t = activeTool();
+  if (!t) return;
+  const { message, color, percent } = e.detail;
+  let cls = "";
+  if (color === "red") cls = "error";
+  else if (color === "#90EE90") cls = "ok";
+  else if (color === "yellow") cls = "warn";
+  logLine(t.log, message, cls);
+  if (t.fill && typeof percent === "number") document.getElementById(t.fill).style.width = percent + "%";
+});
+
+window.addEventListener("job-done", (e) => {
+  const t = activeTool();
+  if (!t) return;
+  const cBtn = document.getElementById(t.cancelBtn);
+  if (cBtn) { cBtn.style.display = "none"; cBtn.disabled = false; }
+  
+  const { ok, message, output_path } = e.detail;
+  logLine(t.log, message, ok ? "ok" : "error");
+  setStatus(t.dot, t.status, ok ? "success" : "error", ok ? "Done" : "Failed");
+  if (t.fill) document.getElementById(t.fill).style.width = "100%";
+  showResult(t.result, ok, message, output_path);
+  document.getElementById(t.btn).disabled = false;
+});
+
+// =======================================================================
+// MODULE LOGIC
+// =======================================================================
+
+// Converter
+const convZone = new FileDropZone({ zoneId: "conv-dropzone", listId: "conv-file-list", fileTypes: ["Convertible Files (*.csv;*.xlsx;*.xls;*.txt)", "All files (*.*)"] });
+document.getElementById("conv-input-type").addEventListener("change", (e) => {
+  document.getElementById("conv-type-hint").textContent = { csv: ".csv", xlsx: ".xlsx", txt: ".txt" }[e.target.value] + " files";
+  convZone.clear();
+});
 document.getElementById("conv-run-btn").addEventListener("click", async () => {
   const inputType = document.getElementById("conv-input-type").value;
   const outputType = document.getElementById("conv-output-type").value;
   const outputFolder = document.getElementById("conv-output-folder").value.trim();
 
+  // MANTIKSAL HATA DÜZELTİLDİ: Giriş ve çıkış formatı aynı olamaz
+  if (inputType === outputType) return toast("Girdi ve Çıktı formatları aynı olamaz.");
   if (!outputFolder) return toast("Pick a destination folder first.");
   if (!convZone.files.length) return toast("Drop at least one file to convert.");
 
-  document.getElementById("conv-console").classList.add("visible");
-  document.getElementById("conv-result").classList.remove("visible");
-  document.getElementById("conv-log").innerHTML = "";
-  document.getElementById("conv-progress-fill").style.width = "0%";
-  setStatus("conv-dot", "conv-status-text", "running", "Converting…");
-  document.getElementById("conv-run-btn").disabled = true;
-
+  prepareJobUI("conv");
   await api().run_converter(convZone.files, outputFolder, inputType, outputType);
 });
 
-// =======================================================================
-// COST UPDATER
-// =======================================================================
-const cuZone = new FileDropZone({
-  zoneId: "cu-dropzone",
-  listId: "cu-file-list",
-  multiple: false,
-  fileTypes: ["CSV Files (*.csv)", "All files (*.*)"],
-  accept: (p) => p.toLowerCase().endsWith(".csv"),
+// TSV
+const tsvZone = new FileDropZone({ zoneId: "tsv-dropzone", listId: "tsv-file-list", fileTypes: ["TSV/Text Files (*.tsv;*.txt)", "All files (*.*)"] });
+document.getElementById("tsv-run-btn").addEventListener("click", async () => {
+  const outputFolder = document.getElementById("tsv-output-folder").value.trim();
+  if (!outputFolder) return toast("Pick a destination folder first.");
+  if (!tsvZone.files.length) return toast("Drop at least one file to convert.");
+  prepareJobUI("tsv");
+  await api().run_tsv(tsvZone.files, outputFolder, document.getElementById("tsv-save-name").value.trim() || "Converted_File");
 });
+
+// Cost Updater
+const cuZone = new FileDropZone({ zoneId: "cu-dropzone", listId: "cu-file-list", multiple: false, fileTypes: ["CSV Files (*.csv)", "All files (*.*)"], accept: (p) => p.toLowerCase().endsWith(".csv") });
+
+let currentCuSettings = {};
 
 async function loadCostUpdaterSettings() {
   const isV2 = document.getElementById("cu-version-toggle").checked;
-  const filename = isV2 ? "costupdater2_settings.txt" : "costupdater_settings.txt";
-  const content = await api().get_settings(filename);
-  document.getElementById("cu-settings").value = content;
+  const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
+  
+  const rawData = await api().get_settings(fileName);
+  try {
+    currentCuSettings = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+  } catch (e) {
+    currentCuSettings = { columns: {}, warehouses: {} };
+  }
+  
+  renderCostUpdaterUI(currentCuSettings, isV2);
 }
+
+function renderCostUpdaterUI(data, isV2) {
+  ['cu-settings-container', 'cu-settings-main-container'].forEach(containerId => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    let html = `<div class="card-title" style="margin-top:4px;">Sütun Eşleştirmeleri</div>`;
+    html += `<p class="muted" style="margin-top:-8px; margin-bottom:14px;">Alternatif isimleri yazıp Enter tuşuna basarak etiket (chip) olarak ekleyin. Eşleşen ilk sütun kullanılacaktır.</p><div class="row-2">`;
+    
+    for (const [key, val] of Object.entries(data.columns || {})) {
+      let chips = (val || []).map(v => `<span class="file-chip" style="margin:2px; padding:3px 6px; border-color:var(--accent);"><span class="file-chip-name">${v}</span><span class="file-chip-remove" data-col="${key}" data-val="${v}" style="margin-left:4px;">&times;</span></span>`).join('');
+      html += `
+        <div class="field">
+          <label class="field-label">${key.toUpperCase()}</label>
+          <div class="tags-wrapper" style="display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--panel-raised); border:1px solid var(--line); border-radius:var(--radius-sm); min-height:36px; align-items:center;">
+            ${chips}
+            <input type="text" class="tag-input" data-col="${key}" style="border:none; background:transparent; outline:none; color:var(--text); flex:1; min-width:80px; font-size:12px;" placeholder="Add and press Enter..." />
+          </div>
+        </div>`;
+    }
+    
+    html += `</div><div class="divider"></div>
+    <div class="card-title" style="margin-bottom:14px;">Depo Maliyetleri</div>
+    <div class="row-2" style="margin-bottom: 14px;">`;
+    
+    for (const [wh, costData] of Object.entries(data.warehouses || {})) {
+      if (isV2) {
+        html += `
+          <div class="field" style="grid-column: span 2; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); position:relative;">
+            <button class="btn-delete-wh" data-wh="${wh}" style="position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:16px; line-height:1;" title="Delete Warehouse">&times;</button>
+            <label class="field-label" style="color: var(--text); font-weight: 600;">${wh} WAREHOUSE</label>
+            <div class="input-row" style="margin-top: 8px; align-items: flex-end;">
+              <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">Add. Cost</label><input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" data-prop="v2_additional_cost" value="${costData.v2_additional_cost}" /></div>
+              <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">Equation</label>
+                <select class="select cu-wh-input" data-wh="${wh}" data-prop="v2_equation" style="width: 100%; padding: 9px 11px;">
+                  <option value="1" ${costData.v2_equation === 1 ? 'selected' : ''}>1</option>
+                  <option value="2" ${costData.v2_equation === 2 ? 'selected' : ''}>2</option>
+                </select>
+              </div>
+              <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">WH Fee</label><input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" data-prop="v2_warehouse_fee" value="${costData.v2_warehouse_fee}" /></div>
+            </div>
+          </div>`;
+      } else {
+        html += `
+          <div class="field" style="position:relative; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: auto;">
+            <label class="field-label">${wh} <button class="btn-delete-wh" data-wh="${wh}" style="background:transparent; border:none; color:var(--err); cursor:pointer; float:right; font-size:16px; line-height:1;" title="Delete Warehouse">&times;</button></label>
+            <input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" value="${costData}" style="margin-top:4px;" />
+          </div>`;
+      }
+    }
+    
+    html += `</div>
+    <div class="divider"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; gap:8px;">
+        <input type="text" class="text-input new-wh-input" placeholder="New Warehouse (e.g., TX)" style="width:160px; font-size:12.8px; padding:6px 11px;" />
+        <button class="btn btn-primary btn-add-warehouse" style="padding:6px 14px;">Add</button>
+      </div>
+      <div style="display:flex;">
+        <button class="btn btn-revert-cu-settings" style="padding:6px 14px; margin-right:8px;" title="Delete unsaved changes">Revert</button>
+        <button class="btn btn-save-cu-settings" style="padding:6px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
+      </div>
+    </div>`;
+    
+    container.innerHTML = html;
+
+    // -- Event Listeners (Bi-directional Data Binding) --
+    
+    // Senkronizasyon
+    document.querySelectorAll(".cu-wh-input").forEach(input => {
+      input.addEventListener("change", (e) => {
+        const wh = e.target.dataset.wh;
+        const prop = e.target.dataset.prop;
+        if (isV2) {
+          currentCuSettings.warehouses[wh][prop] = parseFloat(e.target.value) || 0;
+        } else {
+          currentCuSettings.warehouses[wh] = parseFloat(e.target.value) || 0;
+        }
+      });
+    });
+
+    // Etiket Ekleme
+    document.querySelectorAll(".tag-input").forEach(input => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const val = e.target.value.trim();
+          const col = e.target.dataset.col;
+          if (val && !currentCuSettings.columns[col].includes(val)) {
+            currentCuSettings.columns[col].push(val);
+            renderCostUpdaterUI(currentCuSettings, isV2);
+          }
+        }
+      });
+    });
+
+    // Etiket Silme
+    document.querySelectorAll(".file-chip-remove").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const col = e.currentTarget.dataset.col;
+        const val = e.currentTarget.dataset.val;
+        currentCuSettings.columns[col] = currentCuSettings.columns[col].filter(v => v !== val);
+        renderCostUpdaterUI(currentCuSettings, isV2);
+      });
+    });
+
+    // Çökmeyi Engelleyen Modern Depo Silme (Satır İçi Onay)
+    document.querySelectorAll(".btn-delete-wh").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const wh = e.currentTarget.dataset.wh;
+        if (e.currentTarget.dataset.confirm === "1") {
+          delete currentCuSettings.warehouses[wh];
+          renderCostUpdaterUI(currentCuSettings, isV2);
+        } else {
+          // İki aşamalı doğrulama: Buton 3 saniyeliğine "Sil?" uyarısına dönüşür
+          e.currentTarget.dataset.confirm = "1";
+          e.currentTarget.innerHTML = "Delete?";
+          e.currentTarget.style.fontSize = "11px";
+          e.currentTarget.style.backgroundColor = "var(--err)";
+          e.currentTarget.style.color = "#fff";
+          e.currentTarget.style.padding = "6px 8px";
+          e.currentTarget.style.borderRadius = "4px";
+          e.currentTarget.style.top = "6px";
+          e.currentTarget.style.right = "6px";
+          
+          setTimeout(() => {
+            if (document.body.contains(e.currentTarget)) { // DOM'dan silinmediyse sıfırla
+              e.currentTarget.dataset.confirm = "0";
+              e.currentTarget.innerHTML = "&times;";
+              e.currentTarget.style = "position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:16px; line-height:1;";
+            }
+          }, 3000);
+        }
+      });
+    });
+  
+
+    // Blokajsız Yeni Depo Ekleme
+    const addWhBtn = container.querySelector(".btn-add-warehouse");
+    const addWhInput = container.querySelector(".new-wh-input");
+    
+    if (addWhBtn && addWhInput) {
+      addWhBtn.addEventListener("click", () => {
+        const newWh = addWhInput.value.trim().toUpperCase();
+        if (newWh) {
+          if (!currentCuSettings.warehouses[newWh]) {
+            if (isV2) {
+              currentCuSettings.warehouses[newWh] = { v2_additional_cost: 0, v2_equation: 1, v2_warehouse_fee: 0 };
+            } else {
+              currentCuSettings.warehouses[newWh] = 0;
+            }
+            renderCostUpdaterUI(currentCuSettings, isV2);
+          } else {
+            toast("This warehouse code is already in the system.");
+          }
+        }
+      });
+      
+      // Enter'a basılınca butonu tetikler
+      addWhInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") addWhBtn.click();
+      });
+    }
+
+    // Bağımsız Diske Yazma İşlemi (Save)
+    const saveSettingsBtn = container.querySelector(".btn-save-cu-settings");
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener("click", async () => {
+        saveSettingsBtn.disabled = true;
+        const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
+        await api().save_settings(fileName, JSON.stringify(currentCuSettings));
+        toast("Settings saved to disk successfully.");
+        saveSettingsBtn.disabled = false;
+      });
+    }
+    const revertSettingsBtn = document.getElementById("btn-revert-cu-settings");
+    if (revertSettingsBtn) {
+      revertSettingsBtn.addEventListener("click", () => {
+        loadCostUpdaterSettings();
+        toast("Changes reverted.");
+      });
+    }
+  });
+}
+
 document.getElementById("cu-version-toggle").addEventListener("change", loadCostUpdaterSettings);
 whenApiReady(loadCostUpdaterSettings);
 
 document.getElementById("cu-run-btn").addEventListener("click", async () => {
   const outputFolder = document.getElementById("cu-output-folder").value.trim();
   const isV2 = document.getElementById("cu-version-toggle").checked;
-  const settingsContent = document.getElementById("cu-settings").value;
-  const filename = isV2 ? "costupdater2_settings.txt" : "costupdater_settings.txt";
-
-  if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!cuZone.files.length) return toast("Drop the CSV file to process.");
-
-  await api().save_settings(filename, settingsContent);
-
-  document.getElementById("cu-console").classList.add("visible");
-  document.getElementById("cu-result").classList.remove("visible");
-  document.getElementById("cu-log").innerHTML = "";
-  setStatus("cu-dot", "cu-status-text", "running", "Running…");
-  document.getElementById("cu-run-btn").disabled = true;
-
-  await api().run_costupdater(cuZone.files[0], outputFolder, settingsContent, isV2 ? 2 : 1);
+  
+  if (!outputFolder) return toast("No target folder selected.");
+  if (!cuZone.files.length) return toast("No CSV file to process.");
+  
+  // Veriler anlık olarak currentCuSettings objesine senkronize edildiğinden DOM kazımaya gerek yoktur.
+  const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
+  await api().save_settings(fileName, JSON.stringify(currentCuSettings));
+  
+  prepareJobUI("cu");
+  await api().run_costupdater(cuZone.files[0], outputFolder, currentCuSettings, isV2 ? 2 : 1);
 });
 
-// =======================================================================
-// RESTOCK
-// =======================================================================
+// Restock
 const EXCEL_TYPES = ["Excel Files (*.xlsx;*.xls)", "All files (*.*)"];
 const rsHamZone = new FileDropZone({ zoneId: "rs-ham-dropzone", listId: "rs-ham-file-list", fileTypes: EXCEL_TYPES, reorderable: true });
 const rsExportZone = new FileDropZone({ zoneId: "rs-export-dropzone", listId: "rs-export-file-list", fileTypes: EXCEL_TYPES });
@@ -450,10 +1124,7 @@ function updateRestockCardVisibility() {
   document.getElementById("rs-restock-card").style.display = restockOn ? "" : "none";
 }
 document.getElementById("rs-export-toggle").addEventListener("change", (e) => {
-  // Mirroring the original tool: turning restock on forces export on too.
-  if (e.target.checked === false && document.getElementById("rs-restock-toggle").checked) {
-    document.getElementById("rs-restock-toggle").checked = false;
-  }
+  if (e.target.checked === false && document.getElementById("rs-restock-toggle").checked) document.getElementById("rs-restock-toggle").checked = false;
   updateRestockCardVisibility();
 });
 document.getElementById("rs-restock-toggle").addEventListener("change", (e) => {
@@ -462,16 +1133,18 @@ document.getElementById("rs-restock-toggle").addEventListener("change", (e) => {
 });
 updateRestockCardVisibility();
 
-async function loadRestockSettings() {
-  const content = await api().get_settings("restock_settings.txt");
-  document.getElementById("rs-settings").value = content;
-}
-whenApiReady(loadRestockSettings);
+// Restock Modülü JSON Editor Bağlantısı
+const restockEditor = new JSONConfigEditor("rs-settings-container", "restock_settings.json", [
+  { key: "columns", title: "Column Mappings", type: "tags" },
+  { key: "deposits", title: "Warehouse Costs", type: "key-value" }
+]);
+const mainRestockEditor = new JSONConfigEditor("rs-settings-main-container", "restock_settings.json", [
+  { key: "columns", title: "Column Mappings", type: "tags" },
+  { key: "deposits", title: "Warehouse Costs", type: "key-value" }
+]);
 
 document.getElementById("rs-run-btn").addEventListener("click", async () => {
   const outputFolder = document.getElementById("rs-output-folder").value.trim();
-  const saveName = document.getElementById("rs-save-name").value.trim() || "restock_sonuc";
-  const settingsContent = document.getElementById("rs-settings").value;
   const doExport = document.getElementById("rs-export-toggle").checked;
   const doRestock = document.getElementById("rs-restock-toggle").checked;
 
@@ -480,668 +1153,272 @@ document.getElementById("rs-run-btn").addEventListener("click", async () => {
   if (doExport && !rsExportZone.files.length) return toast("Export step is on — drop export file(s).");
   if (doRestock && !rsRestockZone.files.length) return toast("Restock step is on — drop the main workbook.");
 
-  await api().save_settings("restock_settings.txt", settingsContent);
-  api().set_memory_value("rs-save-name", saveName);
-
-  document.getElementById("rs-console").classList.add("visible");
-  document.getElementById("rs-result").classList.remove("visible");
-  document.getElementById("rs-log").innerHTML = "";
-  document.getElementById("rs-progress-fill").style.width = "0%";
-  setStatus("rs-dot", "rs-status-text", "running", "Running…");
-  document.getElementById("rs-run-btn").disabled = true;
-
-  await api().run_restock(
-    rsHamZone.files,
-    rsExportZone.files,
-    rsRestockZone.files,
-    doExport,
-    doRestock,
-    saveName,
-    outputFolder
-  );
+  // Editor üzerindeki güncel JSON verisini diske kaydet
+  await api().save_settings("restock_settings.json", JSON.stringify(restockEditor.data));
+  prepareJobUI("rs");
+  
+  // Metin dosyası (.txt) değil JSON sözlüğü gönderilir
+  await api().run_restock(rsHamZone.files, rsExportZone.files, rsRestockZone.files, doExport, doRestock, document.getElementById("rs-save-name").value.trim() || "restock_sonuc", outputFolder, restockEditor.data);
 });
 
-// =======================================================================
-// TSV CONVERTER
-// =======================================================================
-const tsvZone = new FileDropZone({
-  zoneId: "tsv-dropzone",
-  listId: "tsv-file-list",
-  fileTypes: ["TSV/Text Files (*.tsv;*.txt)", "All files (*.*)"],
-});
-
-document.getElementById("tsv-run-btn").addEventListener("click", async () => {
-  const outputFolder = document.getElementById("tsv-output-folder").value.trim();
-  const saveName = document.getElementById("tsv-save-name").value.trim() || "Converted_File";
-
+// Future Price
+const fpRestockZone = new FileDropZone({ zoneId: "fp-restock-dropzone", listId: "fp-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
+const fpFutureZone = new FileDropZone({ zoneId: "fp-future-dropzone", listId: "fp-future-file-list", multiple: false, fileTypes: EXCEL_TYPES });
+document.getElementById("fp-run-btn").addEventListener("click", async () => {
+  const outputFolder = document.getElementById("fp-output-folder").value.trim();
   if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!tsvZone.files.length) return toast("Drop at least one file to convert.");
-
-  document.getElementById("tsv-console").classList.add("visible");
-  document.getElementById("tsv-result").classList.remove("visible");
-  document.getElementById("tsv-log").innerHTML = "";
-  setStatus("tsv-dot", "tsv-status-text", "running", "Converting…");
-  document.getElementById("tsv-run-btn").disabled = true;
-
-  await api().run_tsv(tsvZone.files, outputFolder, saveName);
+  if (!fpRestockZone.files.length || !fpFutureZone.files.length) return toast("Drop both restock and future price files.");
+  prepareJobUI("fp");
+  await api().run_future_price(fpRestockZone.files[0], fpFutureZone.files[0], document.getElementById("fp-save-name").value.trim() || "Future_Price_Sonuc", outputFolder);
 });
 
-// =======================================================================
-// ORDER CREATOR
-// =======================================================================
+// Order Creator
 const ocRestockZone = new FileDropZone({ zoneId: "oc-restock-dropzone", listId: "oc-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const ocOrderformZone = new FileDropZone({ zoneId: "oc-orderform-dropzone", listId: "oc-orderform-file-list", multiple: false, fileTypes: EXCEL_TYPES });
-
 document.getElementById("oc-template-btn").addEventListener("click", () => api().open_template_folder());
-
-async function loadOrderCreateSettings() {
-  const content = await api().get_settings("ordercreate_settings.txt");
-  document.getElementById("oc-settings").value = content;
-}
-whenApiReady(loadOrderCreateSettings);
-
+const orderEditor = new JSONConfigEditor("oc-settings-container", "ordercreate_settings.json", [
+  { key: "restock_columns", title: "Restock File Columns", type: "tags" },
+  { key: "orderform_columns", title: "Order Form File Columns", type: "tags" }
+]);
+const mainOrderEditor = new JSONConfigEditor("oc-settings-main-container", "ordercreate_settings.json", [
+  { key: "restock_columns", title: "Restock File Columns", type: "tags" },
+  { key: "orderform_columns", title: "Order Form File Columns", type: "tags" }
+]);
 document.getElementById("oc-run-btn").addEventListener("click", async () => {
   const outputFolder = document.getElementById("oc-output-folder").value.trim();
-  const settingsContent = document.getElementById("oc-settings").value;
-
-  if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!ocRestockZone.files.length) return toast("Drop the restock file.");
-  if (!ocOrderformZone.files.length) return toast("Drop the order form file.");
-
-  await api().save_settings("ordercreate_settings.txt", settingsContent);
-
-  document.getElementById("oc-console").classList.add("visible");
-  document.getElementById("oc-result").classList.remove("visible");
-  document.getElementById("oc-log").innerHTML = "";
-  setStatus("oc-dot", "oc-status-text", "running", "Running…");
-  document.getElementById("oc-run-btn").disabled = true;
-
-  await api().run_order_create(ocRestockZone.files, ocOrderformZone.files, outputFolder, settingsContent);
+  if (!outputFolder || !ocRestockZone.files.length || !ocOrderformZone.files.length) return toast("Ensure files and destination folder are set.");
+  
+  await api().save_settings("ordercreate_settings.json", JSON.stringify(orderEditor.data));
+  prepareJobUI("oc");
+  
+  await api().run_order_create(ocRestockZone.files, ocOrderformZone.files, outputFolder, orderEditor.data);
 });
 
-// =======================================================================
-// INVOICE PROCESSOR
-// =======================================================================
-const invZone = new FileDropZone({
-  zoneId: "inv-dropzone",
-  listId: "inv-file-list",
-  fileTypes: ["CSV Files (*.csv)", "All files (*.*)"],
-});
-
-async function loadInvoiceSettings() {
-  const content = await api().get_settings("invoice_settings.txt");
-  document.getElementById("inv-settings").value = content;
-}
-whenApiReady(loadInvoiceSettings);
-
+// Invoice Processor
+const invZone = new FileDropZone({ zoneId: "inv-dropzone", listId: "inv-file-list", fileTypes: ["CSV Files (*.csv)", "All files (*.*)"] });
+const invoiceEditor = new JSONConfigEditor("inv-settings-container", "invoice_settings.json", [
+  { key: "columns", title: "Column Mappings", type: "tags" }
+]);
+const mainInvoiceEditor = new JSONConfigEditor("inv-settings-main-container", "invoice_settings.json", [
+  { key: "columns", title: "Column Mappings", type: "tags" }
+]);
 document.getElementById("inv-run-btn").addEventListener("click", async () => {
   const outputFolder = document.getElementById("inv-output-folder").value.trim();
   const settingsContent = document.getElementById("inv-settings").value;
-  const deleteZeros = document.getElementById("inv-delzero-toggle").checked;
-
-  if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!invZone.files.length) return toast("Drop at least one invoice CSV.");
-
-  await api().save_settings("invoice_settings.txt", settingsContent);
-
-  document.getElementById("inv-console").classList.add("visible");
-  document.getElementById("inv-result").classList.remove("visible");
-  document.getElementById("inv-log").innerHTML = "";
-  setStatus("inv-dot", "inv-status-text", "running", "Running…");
-  document.getElementById("inv-run-btn").disabled = true;
-
-  await api().run_invoice(invZone.files, outputFolder, settingsContent, deleteZeros);
+  if (!outputFolder || !invZone.files.length) return toast("Drop files and select destination.");
+  await api().save_settings("invoice_settings.json", JSON.stringify(invoiceEditor.data));
+  prepareJobUI("inv");
+  await api().run_invoice(invZone.files, outputFolder, invoiceEditor.data, document.getElementById("inv-delzero-toggle").checked);
 });
 
-// =======================================================================
-// SHIPMENT CREATOR
-// =======================================================================
+// Shipment Creator
 const scInvoiceZone = new FileDropZone({ zoneId: "sc-invoice-dropzone", listId: "sc-invoice-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const scOrderformZone = new FileDropZone({ zoneId: "sc-orderform-dropzone", listId: "sc-orderform-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const scRestockZone = new FileDropZone({ zoneId: "sc-restock-dropzone", listId: "sc-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
-
-async function loadShipmentSettings() {
-  const content = await api().get_settings("shipment_settings.txt");
-  document.getElementById("sc-settings").value = content;
-}
-whenApiReady(loadShipmentSettings);
-
+const shipmentEditor = new JSONConfigEditor("sc-settings-container", "shipment_settings.json", [
+  { key: "restock_columns", title: "Restock File Columns", type: "tags" },
+  { key: "orderform_columns", title: "Order Form File Columns", type: "tags" },
+  { key: "invoice_columns", title: "Invoice File Columns", type: "tags" }
+]);
+const mainShipmentEditor = new JSONConfigEditor("sc-settings-main-container", "shipment_settings.json", [
+  { key: "restock_columns", title: "Restock File Columns", type: "tags" },
+  { key: "orderform_columns", title: "Order Form File Columns", type: "tags" },
+  { key: "invoice_columns", title: "Invoice File Columns", type: "tags" }
+]);
 document.getElementById("sc-run-btn").addEventListener("click", async () => {
   const outputFolder = document.getElementById("sc-output-folder").value.trim();
-  const saveName = document.getElementById("sc-save-name").value.trim() || "shipment_sonuc";
   const dcCode = document.getElementById("sc-dc-code").value.trim();
-  const settingsContent = document.getElementById("sc-settings").value;
-
-  if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!dcCode) return toast("Enter a DC code.");
-  if (!scInvoiceZone.files.length) return toast("Drop the invoice file.");
-  if (!scOrderformZone.files.length) return toast("Drop the order form file.");
-  if (!scRestockZone.files.length) return toast("Drop the restock file.");
-
-  await api().save_settings("shipment_settings.txt", settingsContent);
-  api().set_memory_value("sc-save-name", saveName);
+  if (!outputFolder || !dcCode || !scInvoiceZone.files.length || !scOrderformZone.files.length || !scRestockZone.files.length) return toast("Fill all fields and drop files.");
   api().set_memory_value("sc-dc-code", dcCode);
-
-  document.getElementById("sc-console").classList.add("visible");
-  document.getElementById("sc-result").classList.remove("visible");
-  document.getElementById("sc-log").innerHTML = "";
-  setStatus("sc-dot", "sc-status-text", "running", "Running…");
-  document.getElementById("sc-run-btn").disabled = true;
-
-  await api().run_shipment_creator(
-    scInvoiceZone.files,
-    scOrderformZone.files,
-    scRestockZone.files,
-    dcCode,
-    saveName,
-    outputFolder,
-    settingsContent
-  );
+  await api().save_settings("shipment_settings.json", JSON.stringify(shipmentEditor.data));
+  prepareJobUI("sc");
+  await api().run_shipment_creator(scInvoiceZone.files, scOrderformZone.files, scRestockZone.files, dcCode, document.getElementById("sc-save-name").value.trim() || "shipment_sonuc", outputFolder, shipmentEditor.data);
 });
 
-// =======================================================================
-// FUTURE PRICE
-// =======================================================================
-const fpRestockZone = new FileDropZone({ zoneId: "fp-restock-dropzone", listId: "fp-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
-const fpFutureZone = new FileDropZone({ zoneId: "fp-future-dropzone", listId: "fp-future-file-list", multiple: false, fileTypes: EXCEL_TYPES });
-
-document.getElementById("fp-run-btn").addEventListener("click", async () => {
-  const outputFolder = document.getElementById("fp-output-folder").value.trim();
-  const saveName = document.getElementById("fp-save-name").value.trim() || "Future_Price_Sonuc";
-
-  if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!fpRestockZone.files.length) return toast("Drop the restock file.");
-  if (!fpFutureZone.files.length) return toast("Drop the future price file.");
-
-  api().set_memory_value("fp-save-name", saveName);
-
-  document.getElementById("fp-console").classList.add("visible");
-  document.getElementById("fp-result").classList.remove("visible");
-  document.getElementById("fp-log").innerHTML = "";
-  setStatus("fp-dot", "fp-status-text", "running", "Running…");
-  document.getElementById("fp-run-btn").disabled = true;
-
-  await api().run_future_price(fpRestockZone.files[0], fpFutureZone.files[0], saveName, outputFolder);
-});
-
-// =======================================================================
-// INVOICE FINDER
-// =======================================================================
+// Invoice Finder
 const ifAllinvoicesZone = new FileDropZone({ zoneId: "if-allinvoices-dropzone", listId: "if-allinvoices-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const ifSourceZone = new FileDropZone({ zoneId: "if-source-dropzone", listId: "if-source-file-list", multiple: false, fileTypes: EXCEL_TYPES });
-
-// Mirrors the original app's switch: checked/"on" = date mode (default),
-// unchecked/"off" = UPC mode. Toggling swaps which card is visible, same
-// as the original's upc_active()/upc_deactive() grid show-hide logic.
-function updateInvoiceFinderMode() {
-  const isDateMode = document.getElementById("if-mode-toggle").checked;
-  document.getElementById("if-date-mode-card").style.display = isDateMode ? "" : "none";
-  document.getElementById("if-upc-mode-card").style.display = isDateMode ? "none" : "";
-  document.getElementById("if-mode-label").textContent = isDateMode
-    ? "Mode: search by date (using pasted Amazon data)"
-    : "Mode: search by UPC list";
-}
-document.getElementById("if-mode-toggle").addEventListener("change", updateInvoiceFinderMode);
-updateInvoiceFinderMode();
-
+document.getElementById("if-mode-toggle").addEventListener("change", (e) => {
+  const isDate = e.target.checked;
+  document.getElementById("if-date-mode-card").style.display = isDate ? "" : "none";
+  document.getElementById("if-upc-mode-card").style.display = isDate ? "none" : "";
+  document.getElementById("if-mode-label").textContent = isDate ? "Mode: search by date (using pasted Amazon data)" : "Mode: search by UPC list";
+});
 document.getElementById("if-instructions-btn").addEventListener("click", async () => {
-  const modal = document.getElementById("if-instructions-modal");
-  modal.classList.add("visible");
-  const text = await api().get_invoice_finder_instructions();
-  document.getElementById("if-instructions-body").textContent = text || "No instructions found.";
+  document.getElementById("if-instructions-modal").classList.add("visible");
+  document.getElementById("if-instructions-body").textContent = await api().get_invoice_finder_instructions() || "No instructions found.";
 });
-document.getElementById("if-instructions-close").addEventListener("click", () => {
-  document.getElementById("if-instructions-modal").classList.remove("visible");
-});
-document.getElementById("if-instructions-modal").addEventListener("click", (e) => {
-  if (e.target.id === "if-instructions-modal") e.target.classList.remove("visible");
-});
+document.getElementById("if-instructions-close").addEventListener("click", () => document.getElementById("if-instructions-modal").classList.remove("visible"));
+document.getElementById("if-instructions-modal").addEventListener("click", (e) => { if(e.target.id === "if-instructions-modal") e.target.classList.remove("visible"); });
 
 document.getElementById("if-run-btn").addEventListener("click", async () => {
-  const isDateMode = document.getElementById("if-mode-toggle").checked;
   const outputFolder = document.getElementById("if-output-folder").value.trim();
   const invoiceFolder = document.getElementById("if-invoice-folder").value.trim();
+  if (!outputFolder || !invoiceFolder || !ifAllinvoicesZone.files.length) return toast("Provide all required folders and ALL INVOICES file.");
+  
+  prepareJobUI("if");
 
-  if (!outputFolder) return toast("Pick a destination folder first.");
-  if (!invoiceFolder) return toast("Enter the invoice PDF folder.");
-  if (!ifAllinvoicesZone.files.length) return toast("Drop the ALL INVOICES file.");
-
-  api().set_memory_value("if-output-folder", outputFolder);
-  api().set_memory_value("if-invoice-folder", invoiceFolder);
-
-  document.getElementById("if-console").classList.add("visible");
-  document.getElementById("if-result").classList.remove("visible");
-  document.getElementById("if-log").innerHTML = "";
-  setStatus("if-dot", "if-status-text", "running", "Running…");
-  document.getElementById("if-run-btn").disabled = true;
-
-  if (isDateMode) {
-    const date = document.getElementById("if-date").value.trim();
-    if (!date) {
-      toast("Enter a cutoff date.");
-      document.getElementById("if-run-btn").disabled = false;
-      return;
-    }
-    if (!ifSourceZone.files.length) {
-      toast("Drop the Amazon source file.");
-      document.getElementById("if-run-btn").disabled = false;
-      return;
-    }
-    await api().run_invoice_finder_date_mode(
-      ifSourceZone.files[0],
-      ifAllinvoicesZone.files[0],
-      invoiceFolder,
-      outputFolder,
-      date
-    );
+  if (document.getElementById("if-mode-toggle").checked) {
+    if (!document.getElementById("if-date").value.trim() || !ifSourceZone.files.length) { document.getElementById("if-run-btn").disabled = false; return toast("Provide cutoff date and source file."); }
+    await api().run_invoice_finder_date_mode(ifSourceZone.files[0], ifAllinvoicesZone.files[0], invoiceFolder, outputFolder, document.getElementById("if-date").value.trim());
   } else {
-    const upcs = document.getElementById("if-upcs").value.trim();
-    const months = document.getElementById("if-months").value.trim();
-    if (!upcs) {
-      toast("Enter at least one UPC.");
-      document.getElementById("if-run-btn").disabled = false;
-      return;
-    }
-    if (!months) {
-      toast("Enter a months-back value (0 for all time).");
-      document.getElementById("if-run-btn").disabled = false;
-      return;
-    }
-    await api().run_invoice_finder_upc_mode(
-      ifAllinvoicesZone.files[0],
-      invoiceFolder,
-      outputFolder,
-      upcs,
-      months
-    );
+    if (!document.getElementById("if-upcs").value.trim() || !document.getElementById("if-months").value.trim()) { document.getElementById("if-run-btn").disabled = false; return toast("Provide UPCs and months."); }
+    await api().run_invoice_finder_upc_mode(ifAllinvoicesZone.files[0], invoiceFolder, outputFolder, document.getElementById("if-upcs").value.trim(), document.getElementById("if-months").value.trim());
   }
 });
 
-// =======================================================================
-// EXPIRATION
-// =======================================================================
-// Credentials don't go through the generic text-input memory restore (the
-// password field is type="password", which that loop already skips) —
-// they're loaded explicitly through get_expiration_credentials(), which
-// reads the username from memory and the password from the OS credential
-// vault via keyring (see app.py's get_saved_credentials()).
-async function loadExpirationCredentials() {
+// Expiration
+whenApiReady(async () => {
   const creds = await api().get_expiration_credentials();
   if (creds.username) document.getElementById("exp-username").value = creds.username;
   if (creds.password) document.getElementById("exp-password").value = creds.password;
-}
-whenApiReady(loadExpirationCredentials);
-
+});
 document.getElementById("exp-run-btn").addEventListener("click", async () => {
-  const username = document.getElementById("exp-username").value.trim();
-  const password = document.getElementById("exp-password").value;
-  const shipmentIds = document.getElementById("exp-shipment-ids").value.trim();
-  const outputFolder = document.getElementById("exp-output-folder").value.trim();
-  const remember = document.getElementById("exp-remember-toggle").checked;
-
-  if (!username || !password) return toast("Enter your username and password.");
-  if (!shipmentIds) return toast("Enter at least one shipment ID.");
-  if (!outputFolder) return toast("Pick a destination folder first.");
-
-  document.getElementById("exp-console").classList.add("visible");
-  document.getElementById("exp-result").classList.remove("visible");
-  document.getElementById("exp-log").innerHTML = "";
-  setStatus("exp-dot", "exp-status-text", "running", "Running…");
-  document.getElementById("exp-run-btn").disabled = true;
-
-  await api().run_expiration(username, password, shipmentIds, outputFolder, remember);
+  const [username, password, shipmentIds, outputFolder] = ["exp-username", "exp-password", "exp-shipment-ids", "exp-output-folder"].map(id => document.getElementById(id).value.trim());
+  if (!username || !password || !shipmentIds || !outputFolder) return toast("Fill all required fields.");
+  prepareJobUI("exp");
+  await api().run_expiration(username, password, shipmentIds, outputFolder, document.getElementById("exp-remember-toggle").checked);
 });
 
-// =======================================================================
-// Shared progress / completion events fired from Python (see app.py _emit)
-// =======================================================================
-// Each tool listens globally and routes by checking which console is "running".
-// Since only one job runs at a time per tool in this simple version, we map
-// the currently-active tool by checking button disabled state.
-
-const TOOLS = [
-  { btn: "conv-run-btn", log: "conv-log", dot: "conv-dot", status: "conv-status-text", result: "conv-result", fill: "conv-progress-fill" },
-  { btn: "tsv-run-btn", log: "tsv-log", dot: "tsv-dot", status: "tsv-status-text", result: "tsv-result", fill: null },
-  { btn: "cu-run-btn", log: "cu-log", dot: "cu-dot", status: "cu-status-text", result: "cu-result", fill: null },
-  { btn: "rs-run-btn", log: "rs-log", dot: "rs-dot", status: "rs-status-text", result: "rs-result", fill: "rs-progress-fill" },
-  { btn: "fp-run-btn", log: "fp-log", dot: "fp-dot", status: "fp-status-text", result: "fp-result", fill: null },
-  { btn: "oc-run-btn", log: "oc-log", dot: "oc-dot", status: "oc-status-text", result: "oc-result", fill: null },
-  { btn: "inv-run-btn", log: "inv-log", dot: "inv-dot", status: "inv-status-text", result: "inv-result", fill: null },
-  { btn: "sc-run-btn", log: "sc-log", dot: "sc-dot", status: "sc-status-text", result: "sc-result", fill: null },
-  { btn: "if-run-btn", log: "if-log", dot: "if-dot", status: "if-status-text", result: "if-result", fill: null },
-  { btn: "exp-run-btn", log: "exp-log", dot: "exp-dot", status: "exp-status-text", result: "exp-result", fill: null },
-];
-
-
-function activeTool() {
-  return TOOLS.find((t) => document.getElementById(t.btn).disabled) || null;
-}
-
-window.addEventListener("job-log", (e) => {
-  const t = activeTool();
-  if (!t) return;
-  const { message, color, percent } = e.detail;
-  let cls = "";
-  if (color === "red") cls = "error";
-  else if (color === "#90EE90") cls = "ok";
-  else if (color === "yellow") cls = "warn";
-  logLine(t.log, message, cls);
-  if (t.fill && typeof percent === "number") {
-    document.getElementById(t.fill).style.width = percent + "%";
-  }
-});
-
-window.addEventListener("job-done", (e) => {
-  const t = activeTool();
-  if (!t) return;
-  const { ok, message, output_path } = e.detail;
-  logLine(t.log, message, ok ? "ok" : "error");
-  setStatus(t.dot, t.status, ok ? "success" : "error", ok ? "Done" : "Failed");
-  if (t.fill) document.getElementById(t.fill).style.width = "100%";
-  showResult(t.result, ok, message, output_path);
-  document.getElementById(t.btn).disabled = false;
-});
-
-// =======================================================================
-// SETTINGS EDITOR
-// =======================================================================
-// Lets users edit the .txt settings files without hand-editing. The format
-// stays exactly as-is — this is a convenience layer, not a migration.
-// Users can add new column names, new DC codes, new warehouse rules, etc.
-
-const settingsEditor = {
-  container: null,
-  files: [],
-
-  init() {
-    this.container = document.getElementById("settings-cards");
-  },
-
-  async load() {
-    try {
-      this.files = await api().list_settings_files();
-    } catch (e) {
-      this.files = [];
-      toast("Could not load settings files.");
-    }
-    this.render();
-  },
-
-  render() {
-    if (!this.container) return;
-    this.container.innerHTML = "";
-    if (!this.files.length) {
-      this.container.innerHTML = '<p class="muted">No settings files found.</p>';
-      return;
-    }
-    for (const file of this.files) {
-      const card = this._buildCard(file);
-      this.container.appendChild(card);
-    }
-    this._attachListeners();
-  },
-
-  _buildCard(file) {
-    const card = document.createElement("div");
-    card.className = "settings-card";
-    card.dataset.filename = file.filename;
-
-    const desc = this._describeFile(file.filename);
-    const hints = this._validate(file.filename, file.content);
-
-    card.innerHTML = `
-      <div class="settings-card-head">
-        <span class="settings-card-title">
-          ${file.filename}
-          ${desc ? `<span class="settings-card-desc">${desc}</span>` : ""}
-        </span>
-        <span class="settings-card-toggle">&#9662;</span>
-      </div>
-      <div class="settings-card-body">
-        <textarea class="settings-box" data-filename="${file.filename}">${this._escapeHtml(file.content)}</textarea>
-        <div class="settings-card-hint" data-hints="${file.filename}">${hints}</div>
-        <div class="settings-card-actions">
-          <button class="btn" data-reset="${file.filename}">Reset to Default</button>
-          <button class="btn btn-primary" data-save="${file.filename}">Save</button>
-        </div>
-      </div>
-    `;
-    return card;
-  },
-
-  _describeFile(filename) {
-    const descriptions = {
-      "costupdater_settings.txt": "Cost Updater — V1 (flat additional cost)",
-      "costupdater2_settings.txt": "Cost Updater — V2 (volume/weight equation)",
-      "restock_settings.txt": "Restock — column mappings + per-warehouse deposit cost",
-      "invoice_settings.txt": "Invoice Processor — columns to drop, ship quantity, date",
-      "invoicefinder_yonergeler.txt": "Invoice Finder — instructions (not a config file)",
-      "ordercreate_settings.txt": "Order Creator — restock + order form column mappings",
-      "shipment_settings.txt": "Shipment Creator — restock, order form, invoice mappings",
-    };
-    return descriptions[filename] || "";
-  },
-
-  _validate(filename, content) {
-    // Skip the instructions file — it has no structure to validate
-    if (filename === "invoicefinder_yonergeler.txt") {
-      return '<span class="hint-ok">This is an instructions file — no validation needed.</span>';
-    }
-
-    const hints = [];
-    const hasSeparator = content.includes("=====");
-
-    if (!hasSeparator) {
-      hints.push('<span class="hint-warn">Missing separator line (=====) — column mappings should go above it, rules below it.</span>');
-    } else {
-      const lines = content.split("\n");
-      const sepIndex = lines.findIndex((l) => l.trim().startsWith("====="));
-      const mappings = lines.slice(0, sepIndex).filter((l) => l.includes("="));
-      const rules = lines.slice(sepIndex + 1).filter((l) => l.trim());
-      if (mappings.length === 0) {
-        hints.push('<span class="hint-warn">No column mappings found above the separator.</span>');
-      }
-      if (rules.length === 0) {
-        hints.push('<span class="hint-warn">No rules found below the separator.</span>');
-      }
-      if (mappings.length > 0 && rules.length > 0) {
-        hints.push(`<span class="hint-ok">${mappings.length} mapping(s), ${rules.length} rule(s).</span>`);
-      }
-    }
-
-    return hints.length ? hints.join("<br>") : '<span class="hint-ok">Looks good.</span>';
-  },
-
-  _escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-  },
-
-  _attachListeners() {
-    if (!this.container) return;
-
-    // Collapse / expand on header click
-    this.container.querySelectorAll(".settings-card-head").forEach((head) => {
-      head.addEventListener("click", () => {
-        const card = head.closest(".settings-card");
-        if (card) card.classList.toggle("collapsed");
-      });
-    });
-
-    // Live validation on textarea input
-    this.container.querySelectorAll(".settings-box").forEach((ta) => {
-      ta.addEventListener("input", () => {
-        const filename = ta.dataset.filename;
-        const hintEl = this.container.querySelector(`[data-hints="${filename}"]`);
-        if (hintEl) hintEl.innerHTML = this._validate(filename, ta.value);
-      });
-    });
-
-    // Save buttons
-    this.container.querySelectorAll("[data-save]").forEach((btn) => {
-      btn.addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        const filename = btn.dataset.save;
-        const ta = this.container.querySelector(`textarea[data-filename="${filename}"]`);
-        if (!ta) return;
-        btn.disabled = true;
-        btn.textContent = "Saving…";
-        try {
-          await api().save_settings(filename, ta.value);
-          toast(`${filename} saved.`);
-        } catch (e) {
-          toast(`Could not save ${filename}.`);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = "Save";
-        }
-      });
-    });
-
-    // Reset buttons
-    this.container.querySelectorAll("[data-reset]").forEach((btn) => {
-      btn.addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        const filename = btn.dataset.reset;
-        if (!confirm(`Reset ${filename} to its original default? Your changes will be lost.`)) return;
-        btn.disabled = true;
-        try {
-          const ok = await api().reset_settings_to_default(filename);
-          if (ok) {
-            toast(`${filename} reset to default.`);
-            this.load();  // refresh all cards
-          } else {
-            toast(`No default available for ${filename}.`);
-          }
-        } catch (e) {
-          toast(`Could not reset ${filename}.`);
-        } finally {
-          btn.disabled = false;
-        }
-      });
-    });
-  },
-};
-
-// =======================================================================
-// UPDATES VIEW
-// =======================================================================
-
+// Updates View
 const updatesView = {
-  checkBtn: null,
-  installBtn: null,
-  notesBtn: null,
-  statusEl: null,
-  progressEl: null,
-  progressFill: null,
-  badge: null,
-  versionEl: null,
+  currentVersion: "",
   latestData: null,
-  currentVersion: "v1.2.4",  // keep in sync with Python CURRENT_VERSION
-
-  init() {
-    this.checkBtn = document.getElementById("updates-check-btn");
-    this.installBtn = document.getElementById("updates-install-btn");
-    this.notesBtn = document.getElementById("updates-notes-btn");
-    this.statusEl = document.getElementById("updates-status");
-    this.progressEl = document.getElementById("updates-progress");
-    this.progressFill = document.getElementById("updates-progress-fill");
-    this.badge = document.getElementById("update-badge");
-    this.versionEl = document.getElementById("updates-current-version");
-
-    if (this.versionEl) this.versionEl.textContent = this.currentVersion;
-    if (this.checkBtn) this.checkBtn.addEventListener("click", () => this.check());
-    if (this.installBtn) this.installBtn.addEventListener("click", () => this.install());
-    if (this.notesBtn) this.notesBtn.addEventListener("click", () => this.showNotes());
+  async init() {
+    this.currentVersion = await api().get_current_version();
+    const vEl = document.getElementById("updates-current-version"); if (vEl) vEl.textContent = this.currentVersion;
+    document.getElementById("updates-check-btn")?.addEventListener("click", () => this.check());
+    document.getElementById("updates-install-btn")?.addEventListener("click", () => this.install());
+    document.getElementById("updates-notes-btn")?.addEventListener("click", () => {
+      const rawNotes = this.latestData?.notes || "No notes.";
+      document.getElementById("if-instructions-body").innerHTML = parseMarkdown(rawNotes);
+      document.getElementById("if-instructions-modal").classList.add("visible");
+    });
   },
-
   async check() {
-    if (this.checkBtn) this.checkBtn.disabled = true;
-    if (this.statusEl) { this.statusEl.textContent = "Checking…"; this.statusEl.className = ""; }
-    if (this.installBtn) this.installBtn.style.display = "none";
-    if (this.notesBtn) this.notesBtn.style.display = "none";
-    if (this.progressEl) this.progressEl.style.display = "none";
+    document.getElementById("updates-check-btn").disabled = true;
+    document.getElementById("updates-status").textContent = "Checking…";
     await api().run_check_for_updates();
   },
-
   install() {
-    if (!this.latestData || !this.latestData.assets || !this.latestData.assets.length) return;
-    // Prefer a .exe asset; fall back to the first asset
-    const asset = this.latestData.assets.find((a) => a.name && a.name.endsWith(".exe"))
-      || this.latestData.assets[0];
+    const asset = this.latestData?.assets.find(a => a.name.endsWith(".exe")) || this.latestData?.assets[0];
     if (!asset) return;
-    if (this.statusEl) { this.statusEl.textContent = "Downloading…"; this.statusEl.className = ""; }
-    if (this.progressEl) this.progressEl.style.display = "block";
-    if (this.installBtn) this.installBtn.disabled = true;
-    if (this.checkBtn) this.checkBtn.disabled = true;
+    document.getElementById("updates-status").textContent = "Downloading…";
+    document.getElementById("updates-progress").style.display = "block";
     api().run_download_update(asset.browser_download_url);
-  },
-
-  showNotes() {
-    const modal = document.getElementById("if-instructions-modal");
-    const titleEl = document.querySelector("#if-instructions-modal .modal-title");
-    const bodyEl = document.getElementById("if-instructions-body");
-    if (!modal) return;
-    if (titleEl) titleEl.textContent = `Release Notes — ${this.latestData?.version || ""}`;
-    if (bodyEl) bodyEl.textContent = this.latestData?.notes || "(No release notes available.)";
-    modal.classList.add("visible");
-  },
+  }
 };
 
-window.addEventListener("update-status", (e) => {
-  const d = e.detail;
-  switch (d.state) {
-    case "no-internet":
-      if (updatesView.statusEl) { updatesView.statusEl.textContent = "No internet connection."; updatesView.statusEl.className = "error"; }
-      if (updatesView.checkBtn) updatesView.checkBtn.disabled = false;
-      break;
-    case "check-failed":
-      if (updatesView.statusEl) { updatesView.statusEl.textContent = "Could not reach GitHub. Try again later."; updatesView.statusEl.className = "error"; }
-      if (updatesView.checkBtn) updatesView.checkBtn.disabled = false;
-      break;
-    case "up-to-date":
-      if (updatesView.statusEl) { updatesView.statusEl.textContent = `You're up to date (v${d.version}).`; updatesView.statusEl.className = "ok"; }
-      if (updatesView.checkBtn) updatesView.checkBtn.disabled = false;
-      break;
-    case "update-available":
-      updatesView.latestData = d;
-      if (updatesView.statusEl) { updatesView.statusEl.textContent = `New version available: ${d.version}`; updatesView.statusEl.className = "warn"; }
-      if (updatesView.installBtn) updatesView.installBtn.style.display = "";
-      if (updatesView.notesBtn) updatesView.notesBtn.style.display = "";
-      if (updatesView.versionEl) { updatesView.versionEl.textContent = updatesView.currentVersion; updatesView.versionEl.classList.add("new"); }
-      if (updatesView.checkBtn) updatesView.checkBtn.disabled = false;
-      break;
+window.addEventListener("update-status", e => {
+  const s = document.getElementById("updates-status");
+  document.getElementById("updates-check-btn").disabled = false;
+  
+  if(e.detail.state === "update-available") { 
+      s.textContent = `New version available: ${e.detail.version}`; 
+      document.getElementById("updates-install-btn").style.display = ""; 
+      document.getElementById("updates-notes-btn").style.display = ""; 
+      updatesView.latestData = e.detail; 
+  } else if (e.detail.state === "up-to-date") {
+      // Ekrana sadece "up-to-date" yazdırmak yerine durumu netleştir.
+      s.textContent = `Uygulama güncel. (Sunucudaki sürüm: ${e.detail.version})`;
+  } else {
+      s.textContent = e.detail.state;
   }
 });
 
-window.addEventListener("update-download-progress", (e) => {
-  const d = e.detail;
-  if (d.error) {
-    if (updatesView.statusEl) { updatesView.statusEl.textContent = d.error; updatesView.statusEl.className = "error"; }
-    if (updatesView.installBtn) updatesView.installBtn.disabled = false;
-    if (updatesView.checkBtn) updatesView.checkBtn.disabled = false;
-    return;
+window.addEventListener("update-badge", e => {
+  const data = e.detail;
+  updatesView.latestData = data;
+  
+  const updateNavItem = document.querySelector('.nav-item[data-view="updates"]');
+  if (updateNavItem) {
+      updateNavItem.classList.add("has-update");
   }
-  if (d.message && updatesView.statusEl) updatesView.statusEl.textContent = d.message;
-  if (typeof d.percent === "number" && updatesView.progressFill) {
-    updatesView.progressFill.style.width = d.percent + "%";
-    if (updatesView.progressEl) updatesView.progressEl.style.display = "block";
-  }
+  const s = document.getElementById("updates-status");
+  const b = document.getElementById("update-badge");
+  if (b) { b.classList.add("visible"); b.innerHTML = data.version; }
+  if (s) s.textContent = `New version available: ${data.version}`;
+  const installBtn = document.getElementById("updates-install-btn");
+  if (installBtn) installBtn.style.display = "";
+  const notesBtn = document.getElementById("updates-notes-btn");
+  if (notesBtn) notesBtn.style.display = "";
+  
+  toast(`New update is available: ${data.version}`);
 });
 
-window.addEventListener("update-badge", (e) => {
-  const d = e.detail;
-  updatesView.latestData = d;
-  if (updatesView.badge) {
-    updatesView.badge.textContent = d.version;
-    updatesView.badge.classList.add("visible");
+// Responsive Init
+function applyResponsiveSettings() {
+  const narrow = document.querySelector(".main")?.clientWidth < 720;
+  document.querySelectorAll(".settings-card").forEach(c => { if(narrow) c.classList.add("collapsed"); else if(c.dataset.userToggled!=="1") c.classList.remove("collapsed"); });
+}
+window.addEventListener("resize", () => requestAnimationFrame(applyResponsiveSettings));
+document.addEventListener("click", e => { 
+  const head = e.target.closest(".settings-card-head"); 
+  if (head) {
+    const card = head.closest(".settings-card");
+    card.classList.toggle("collapsed");
+    card.dataset.userToggled = "1";
   }
-  // Pre-enable install/notes buttons so user can jump straight in
-  if (updatesView.installBtn) updatesView.installBtn.style.display = "";
-  if (updatesView.notesBtn) updatesView.notesBtn.style.display = "";
-  if (updatesView.versionEl) updatesView.versionEl.classList.add("new");
 });
+whenApiReady(() => { 
+  updatesView.init(); 
+  applyResponsiveSettings(); 
+  if (api() && api().run_silent_update_check) {
+      api().run_silent_update_check();
+  }
+});
+whenApiReady(async () => {
+  restockEditor.load();
+  orderEditor.load();
+  invoiceEditor.load();
+  shipmentEditor.load();
+});
+  // Eski whenApiReady fonksiyonunun geri kalan kodları aynı kalacak...
+// =======================================================================
+// FLUID LAYOUT ZOOM & SCROLL FIX (Ctrl + Scroll / Ctrl + Keys)
+// =======================================================================
+let currentZoom = 1.0;
 
-// Initialize once pywebview API is ready
-whenApiReady(() => { settingsEditor.init(); settingsEditor.load(); updatesView.init(); });
+function updateAppZoom(newZoom, save = true) {
+  currentZoom = Math.max(0.5, Math.min(newZoom, 2.0));
+  
+  const appEl = document.querySelector(".app");
+  if (appEl) {
+    appEl.style.transform = `scale(${currentZoom})`;
+    appEl.style.width = `${(100 / currentZoom)}vw`;
+    appEl.style.height = `${(100 / currentZoom)}vh`;
+  }
+  
+  // Değer değiştiğinde Python tarafındaki hafızaya (last_paths.json) kaydet
+  if (save && api()) {
+    api().set_memory_value("app_zoom", currentZoom);
+  }
+}
+
+// Ctrl + Fare Tekeri ile Yakınlaştırma/Uzaklaştırma
+window.addEventListener('wheel', function(e) {
+  if (e.ctrlKey) {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      updateAppZoom(currentZoom + 0.1);
+    } else {
+      updateAppZoom(currentZoom - 0.1);
+    }
+  }
+}, { passive: false });
+
+// Ctrl + (+), Ctrl + (-) ve Ctrl + (0) kısayolları
+window.addEventListener('keydown', function(e) {
+  if (e.ctrlKey) {
+    if (e.key === '=' || e.key === '+') {
+      e.preventDefault();
+      updateAppZoom(currentZoom + 0.1);
+    } else if (e.key === '-') {
+      e.preventDefault();
+      updateAppZoom(currentZoom - 0.1);
+    } else if (e.key === '0') {
+      e.preventDefault();
+      updateAppZoom(1.0); // Varsayılana sıfırla (%100)
+    }
+  }
+});
