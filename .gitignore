@@ -27,3 +27,6 @@ main.py
 Settings/*.json
 Settings/*.txt
 build_tkinter.spec
+.VSCodeCounter/
+.venv12/
+repomix.config.json

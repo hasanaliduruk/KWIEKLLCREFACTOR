@@ -13,6 +13,7 @@ from packaging import version
 import time
 import ctypes
 import platform
+import dataclasses
 
 import requests  
 import webview  
@@ -29,8 +30,10 @@ from core.shipment_creator import process_shipment_creation
 from core.future_price_updater import process_future_price
 from core.invoice_finder import process_invoice_finder, process_invoice_finder_upc
 from core.expiration_processor import process_expiration
+from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
+from core.pk_extractor import PKExtractorEngine
 
-CURRENT_VERSION = "v1.3.4"
+CURRENT_VERSION = "v1.3.5"
 GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -412,6 +415,135 @@ class Api:
         except Exception:
             pass
 
+    # =======================================================================
+    # FBA INVENTORY PRO API ENDPOINTS
+    # =======================================================================
+    
+    def _get_inventory_db(self):
+        # Veritabanını Settings klasöründe güvenli bir yere kaydet
+        db_path = os.path.join(SETTINGS_BASE_DIR, "Settings", "fba_inventory.db")
+        return DatabaseManager(db_path)
+
+    def inv_import_master_excel(self, file_path):
+        try:
+            db = self._get_inventory_db()
+            success, msg = db.import_babil_master_excel(file_path)
+            return {"ok": success, "message": msg}
+        except Exception as e:
+            return {"ok": False, "message": f"Hata: {str(e)}"}
+
+    def inv_import_picklist(self, file_paths):
+        try:
+            db = self._get_inventory_db()
+            count, skipped = 0, []
+            for f in file_paths:
+                candidate_ids = ShipmentIDExtractor.extract_shipment_ids_from_file(f)
+                if any(db.is_shipment_exists(c_id) for c_id in candidate_ids):
+                    skipped.append(candidate_ids.pop() if candidate_ids else "Bilinmeyen")
+                    continue
+                header, items = PicklistParser.parse_picklist_file(f)
+                if db.is_shipment_exists(header.shipment_id):
+                    skipped.append(header.shipment_id)
+                    continue
+                db.add_picklist_shipment(header, items)
+                count += 1
+                
+            msg = f"{count} dosya aktarıldı. "
+            if skipped:
+                msg += f"Atlanan (Mevcut) ID'ler: {', '.join(skipped)}"
+            return {"ok": True, "message": msg}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_import_stock(self, file_path):
+        try:
+            db = self._get_inventory_db()
+            if file_path.endswith('.csv'):
+                try: df = pd.read_csv(file_path, encoding='utf-8')
+                except: df = pd.read_csv(file_path, encoding='latin1')
+            else:
+                df = pd.read_excel(file_path)
+
+            sku_col = 'Merchant SKU' if 'Merchant SKU' in df.columns else ('SKU' if 'SKU' in df.columns else df.columns[0])
+            sum_cols = ['Available', 'FC transfer', 'FC Processing', 'Unfulfillable', 'Shipped', 'Receiving']
+            has_formula = all(c in df.columns for c in sum_cols)
+            
+            stock_dict = {}
+            for _, r in df.iterrows():
+                s = str(r[sku_col]).strip()
+                if not s or s.lower() == 'nan': continue
+                if has_formula:
+                    q = sum(int(pd.to_numeric(r[c], errors='coerce')) if pd.notnull(pd.to_numeric(r[c], errors='coerce')) else 0 for c in sum_cols)
+                else:
+                    qty_col = 'Total Units' if 'Total Units' in df.columns else ('QTY' if 'QTY' in df.columns else df.columns[1])
+                    val = pd.to_numeric(r[qty_col], errors='coerce')
+                    q = int(val) if pd.notnull(val) else 0
+                stock_dict[s] = q
+
+            db.update_amazon_stock(stock_dict)
+            return {"ok": True, "message": f"Stok güncellendi ({len(stock_dict)} SKU)."}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_detect_missing_ids(self, file_path):
+        try:
+            extracted = ShipmentIDExtractor.extract_shipment_ids_from_file(file_path)
+            if not extracted: return {"ok": False, "message": "FBA Shipment ID tespit edilemedi."}
+            db = self._get_inventory_db()
+            registered = db.get_all_registered_shipment_ids()
+            missing = sorted(list(extracted - registered))
+            return {"ok": True, "extracted": len(extracted), "missing": missing}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_get_all_data(self):
+        try:
+            db = self._get_inventory_db()
+            sirali, analiz = FIFOEngine.calculate_fifo(db.get_all_shipments_sorted_by_date(), db.get_amazon_stock_map())
+            
+            safe_sirali = []
+            for item in sirali:
+                # Eğer item bir dataclass ise dict'e çevir, değilse kopyala
+                d_item = dataclasses.asdict(item) if dataclasses.is_dataclass(item) else dict(item)
+                # JSON hatasını önlemek için datetime objesini string'e çevir veya sil
+                if 'created_dt' in d_item:
+                    d_item['created_dt'] = d_item['created_dt'].isoformat() if d_item['created_dt'] else None
+                safe_sirali.append(d_item)
+                
+            safe_analiz = []
+            for item in analiz:
+                d_item = dataclasses.asdict(item) if dataclasses.is_dataclass(item) else dict(item)
+                if 'created_dt' in d_item:
+                    d_item['created_dt'] = d_item['created_dt'].isoformat() if d_item['created_dt'] else None
+                safe_analiz.append(d_item)
+
+            return {"ok": True, "sirali": safe_sirali, "analiz": safe_analiz, "stock": db.get_amazon_stock_map()}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_update_note(self, shipment_id, sku, exp_date_usa, note):
+        try:
+            self._get_inventory_db().update_item_note(shipment_id, sku, exp_date_usa, note)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_reset_data(self):
+        try:
+            self._get_inventory_db().reset_all_data()
+            return {"ok": True, "message": "Veritabanı sıfırlandı."}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_export_excel(self, output_folder):
+        try:
+            today_str = datetime.now().strftime("%Y.%m.%d")
+            file_path = os.path.join(output_folder, f"Expration Date Analizi_{today_str}.xlsx")
+            ExcelReportExporter.export_master_excel(file_path, self._get_inventory_db())
+            return {"ok": True, "path": file_path}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
     # -- İşlem Yürütme Modülleri (Thread-Safe ve İptal Destekli) --
 
     def run_converter(self, files, output_folder, input_type, output_type):
@@ -624,6 +756,35 @@ class Api:
             try:
                 result = process_future_price(output_folder, save_name, restock_file, future_file, progress)
                 self._emit("job-done", {"ok": True, "message": result["message"], "output_path": result["output_path"]})
+            except InterruptedError:
+                self._emit("job-done", {"ok": False, "message": "İşlem kullanıcı tarafından durduruldu."})
+            except Exception as e:
+                self._emit("job-done", {"ok": False, "message": str(e)})
+            finally:
+                self._job_lock.release()
+
+        Thread(target=worker, daemon=True).start()
+        return True
+
+    def run_pk_extractor(self, file_path):
+        if not self._job_lock.acquire(blocking=False):
+            self._emit("job-log", {"message": "Sistemde zaten çalışan bir işlem var.", "color": "red"})
+            return False
+
+        self._reset_cancel_flag()
+
+        def progress(msg):
+            if self._cancel_event.is_set():
+                raise InterruptedError("İşlem iptal edildi.")
+            self._emit("job-log", {"message": msg})
+
+        def worker():
+            try:
+                progress("İşlem başlatılıyor...")
+                total, modified, out_path = PKExtractorEngine.process_file(file_path, progress_callback=progress)
+                
+                success_msg = f"İşlem başarıyla tamamlandı! Toplam Satır: {total} | Değişen PK: {modified}"
+                self._emit("job-done", {"ok": True, "message": success_msg, "output_path": out_path})
             except InterruptedError:
                 self._emit("job-done", {"ok": False, "message": "İşlem kullanıcı tarafından durduruldu."})
             except Exception as e:
@@ -909,7 +1070,7 @@ def main():
         api.run_silent_update_check()
 
     window.events.loaded += on_loaded
-    webview.start(debug=False, icon=icon_path)
+    webview.start(debug=True, icon=icon_path)
 
 if __name__ == "__main__":
     main()

@@ -2312,3 +2312,84 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
 .anim-pop {
   animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* FBA TABLE STYLES */
+.fba-tables {
+  display: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  scrollbar-width: thin;
+  cursor: grab;
+  user-select: none;
+}
+
+.fba-tables.active {
+  animation: fadeIn 0.2s ease;
+  padding: 0;
+  margin: 0;
+  display: flex;
+}
+
+.fba-tables .grab {
+  cursor: grabbing;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  background-color: var(--panel);
+  color: var(--text);
+  white-space: nowrap;
+  margin: 0 auto; /* Ortalamak için */
+}
+
+.data-table th, .data-table td {
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  text-align: left; /* Metinler sola, sayılar sağa, başlıklar ortaya hizalanabilir */
+}
+
+.data-table th {
+  background-color: #1F497D;
+  color: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  text-align: center;
+  font-weight: 600;
+}
+
+.data-table td.text-center, .data-table th.text-center { text-align: center; }
+.data-table td.text-right, .data-table th.text-right { text-align: data-right; }
+
+.data-table tbody tr:nth-child(even) {
+  background-color: var(--panel-raised);
+}
+
+.data-table tbody tr:hover {
+  background-color: rgba(2, 136, 209, 0.08);
+}
+
+.clickable-cell {
+  cursor: pointer;
+  /* transition: background-color 0.2s; */
+}
+
+.clickable-cell:hover {
+  background-color: rgba(2, 136, 209, 0.3) !important;
+  color: var(--text);
+}
+
+mark.highlight {
+  background-color: #ffeb3b;
+  color: #000000;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: bold;
+}
