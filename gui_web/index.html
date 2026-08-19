@@ -29,7 +29,7 @@
       </div>
       <div>
         <div class="brand-title">Operations Toolkit</div>
-        <div class="brand-sub">v1.3.4 · desktop</div>
+        <div class="brand-sub">v1.3.5 · desktop</div>
       </div>
     </div>
 
@@ -45,6 +45,10 @@
     <div class="nav-item" data-view="ordercreate">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11"/></svg>
       <span>Order Creator</span>
+    </div>
+    <div class="nav-item" data-view="fba">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      <span>FBA Inventory</span>
     </div>
 
     <div class="nav-group-label">Shipping</div>
@@ -79,10 +83,16 @@
       <span>Invoice Finder</span>
     </div>
 
-    <div class="nav-group-label">Compliance</div>
-    <div class="nav-item" data-view="expiration">
+    <div class="nav-group-label" style="display: none;">Compliance</div>
+    <div class="nav-item" data-view="expiration" style="display: none;">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
       <span>Expiration</span>
+    </div>
+
+    <div class="nav-group-label">Extractor</div>
+    <div class="nav-item" data-view="extractor">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+      <span>PK Extractor</span>
     </div>
 
     <div class="nav-group-label">System</div>
@@ -738,6 +748,94 @@
       <div class="result-banner" id="sc-result"></div>
     </section>
 
+    <!-- FBA INVENTORY VIEW -->
+    <section id="view-fba" class="view">
+      <div class="view-header">
+        <h2>FBA Inventory & FIFO Pro</h2>
+        <p class="muted">SKT ve FIFO tabanlı stok erime analizi.</p>
+      </div>
+
+      <div class="card" style="margin-bottom: 15px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;">
+          <button id="fba-btn-master" class="btn btn-primary">📂 Master Excel</button>
+          <button id="fba-btn-picklist" class="btn" style="background-color: #0288d1; color: white;">📦 2D Picklist</button>
+          <button id="fba-btn-stock" class="btn" style="background-color: #7b1fa2; color: white;">📊 AMZ Stok</button>
+          <button id="fba-btn-detect" class="btn" style="background-color: #e65100; color: white;">🔍 ID Tespit</button>
+          <button id="fba-btn-reset" class="btn" style="background-color: #c62828; color: white;">⚠️ Sıfırla</button>
+          <div style="flex: 1;"></div>
+          <button id="fba-btn-export" class="btn" style="background-color: #2e7d32; color: white;">📥 Excel Çıktısı</button>
+        </div>
+        
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm);">
+          <span style="font-size: 13px; font-weight: bold;">SKT Gün:</span>
+          <input type="number" id="fba-skt-min" class="text-input" placeholder="Min" style="width: 70px;">
+          <input type="number" id="fba-skt-max" class="text-input" placeholder="Max" style="width: 70px;">
+          
+          <span style="font-size: 13px; font-weight: bold; margin-left: 10px;">AMZ Stok Gün:</span>
+          <input type="number" id="fba-amz-min" class="text-input" placeholder="Min" style="width: 70px;">
+          <input type="number" id="fba-amz-max" class="text-input" placeholder="Max" style="width: 70px;">
+          
+          <button id="fba-btn-clear-filters" class="btn btn-sm">Sıfırla</button>
+          <div style="flex: 1;"></div>
+          <input type="text" id="fba-search" class="text-input" placeholder="🔍 SKU veya ID Ara..." style="width: 200px;">
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+        <button class="settings-tab-btn active" data-target="fba-tab-sirali">SIRALI</button>
+        <button class="settings-tab-btn" data-target="fba-tab-analiz">ANALİZ (FIFO)</button>
+        <button class="settings-tab-btn" data-target="fba-tab-amz">AMAZON GÜNCEL STOK</button>
+      </div>
+
+      <div id="fba-tab-sirali" class="fba-tables active" style="overflow-x: auto;">
+        <table class="data-table" id="fba-table-sirali">
+          <thead><tr><th>SHIPMENT NAME</th><th>SHIPMENT ID</th><th>DATE</th><th>SKU</th><th>QTY</th><th>EXP USA</th><th>EXP TUR</th><th>SKT GÜN</th><th>AMZ GÜN</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="fba-tab-analiz" class="fba-tables" style="overflow-x: auto;">
+        <table class="data-table" id="fba-table-analiz">
+          <thead><tr><th>SHIPMENT NAME</th><th>SHIPMENT ID</th><th>SKU</th><th>QTY</th><th>AMZ STOK</th><th>AMZ GÜN</th><th>SKT GÜN</th><th>NOT</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="fba-tab-amz" class="fba-tables" style="overflow-x: auto;">
+        <table class="data-table" id="fba-table-amz" style="width: 400px;">
+          <thead><tr><th>SKU</th><th>Total Units</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PK EXTRACTOR VIEW -->
+    <section id="view-extractor" class="view">
+      <div class="view-header">
+        <h2>PK Çıkarıcı</h2>
+        <p class="muted">Ürün başlıklarından paket adedini (PK) otomatik çıkarır.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">CSV file</div>
+        <div class="dropzone" id="pe-csv-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop the CSV workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">.csv</div>
+        </div>
+        <div class="file-list" id="pe-csv-file-list"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-danger" id="pe-cancel-btn" style="display:none;">Cancel</button>
+        <button class="btn btn-primary" id="pe-run-btn">Run</button>
+      </div>
+      <div class="console" id="pe-console">
+        <div class="console-head"><span class="console-dot" id="pe-dot"></span><span id="pe-status-text">Idle</span></div>
+        <div class="console-body" id="pe-log"></div>
+      </div>
+      <div class="result-banner" id="pe-result"></div>
+    </section>
+
     <!-- ---------------------------------------------------------------- -->
     <!-- EXPIRATION VIEW                                                   -->
     <!-- ---------------------------------------------------------------- -->
@@ -859,7 +957,7 @@
 
       <div class="card">
         <div class="card-title">Current version</div>
-        <div class="update-version" id="updates-current-version">v1.3.4</div>
+        <div class="update-version" id="updates-current-version">v1.3.5</div>
         <p class="muted" style="margin-top:6px;">Your installed version.</p>
       </div>
 

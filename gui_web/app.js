@@ -367,7 +367,7 @@ createThemeSwatches();
 document.querySelectorAll(".settings-tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".settings-tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".settings-tab-pane").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".fba-tables").forEach(p => p.classList.remove("active"));
     
     btn.classList.add("active");
     document.getElementById(btn.dataset.target).classList.add("active");
@@ -532,6 +532,9 @@ whenApiReady(async () => {
   const savedFont = parseInt(mem["opkit_font"] || DEFAULT_FONT, 10);
   applyTheme(savedTheme);
   applyFontSize(savedFont);
+
+  fbaManager.init();
+  fbaManager.reloadData();
 
   if (mem["app_zoom"]) {
     updateAppZoom(parseFloat(mem["app_zoom"]), false);
@@ -802,6 +805,7 @@ const TOOLS = [
   { btn: "sc-run-btn", cancelBtn: "sc-cancel-btn", log: "sc-log", dot: "sc-dot", status: "sc-status-text", result: "sc-result", fill: null, console: "sc-console" },
   { btn: "if-run-btn", cancelBtn: "if-cancel-btn", log: "if-log", dot: "if-dot", status: "if-status-text", result: "if-result", fill: null, console: "if-console" },
   { btn: "exp-run-btn", cancelBtn: "exp-cancel-btn", log: "exp-log", dot: "exp-dot", status: "exp-status-text", result: "exp-result", fill: null, console: "exp-console" },
+  { btn: "pe-run-btn", cancelBtn: "pe-cancel-btn", log: "pe-log", dot: "pe-dot", status: "pe-status-text", result: "pe-result", fill: null, console: "pe-console" },
 ];
 
 function activeTool() { return TOOLS.find((t) => document.getElementById(t.btn)?.disabled) || null; }
@@ -889,6 +893,228 @@ document.getElementById("tsv-run-btn").addEventListener("click", async () => {
   prepareJobUI("tsv");
   await api().run_tsv(tsvZone.files, outputFolder, document.getElementById("tsv-save-name").value.trim() || "Converted_File");
 });
+
+// =======================================================================
+// FBA INVENTORY PRO MODULE
+// =======================================================================
+const fbaManager = {
+  data: { sirali: [], analiz: [], stock: {} },
+
+  init() {
+    document.querySelector("#view-fba").addEventListener("click", (e) => {
+      const td = e.target.closest("td.clickable-cell");
+      if (!td) return;
+      const textToCopy = td.textContent.trim();
+      if (textToCopy) {
+        navigator.clipboard.writeText(textToCopy);
+        toast(`📋 Kopyalandı: ${textToCopy}`);
+      }
+    });
+    document.getElementById("fba-btn-master")?.addEventListener("click", () => this.importFile("master"));
+    document.getElementById("fba-btn-picklist")?.addEventListener("click", () => this.importFile("picklist"));
+    document.getElementById("fba-btn-stock")?.addEventListener("click", () => this.importFile("stock"));
+    document.getElementById("fba-btn-detect")?.addEventListener("click", () => this.detectIDs());
+    document.getElementById("fba-btn-reset")?.addEventListener("click", () => this.resetData());
+    document.getElementById("fba-btn-export")?.addEventListener("click", () => this.exportExcel());
+
+    // Debounce Zamanlayıcısı
+    let debounceTimer;
+    
+    const filterInputs = ["fba-skt-min", "fba-skt-max", "fba-amz-min", "fba-amz-max", "fba-search"];
+    filterInputs.forEach(id => {
+      document.getElementById(id)?.addEventListener("input", () => {
+        // Kullanıcı yazmaya devam ediyorsa önceki emri iptal et
+        clearTimeout(debounceTimer);
+        // Yazma işlemi bittikten 250 milisaniye sonra filtreyi çalıştır
+        debounceTimer = setTimeout(() => this.applyFilters(), 250);
+      });
+    });
+
+    document.getElementById("fba-btn-clear-filters")?.addEventListener("click", () => {
+      filterInputs.forEach(id => document.getElementById(id).value = "");
+      this.applyFilters();
+    });
+  },
+
+  async reloadData() {
+    const res = await api().inv_get_all_data();
+    if (res.ok) {
+      this.data = res;
+      this.renderTables();
+    } else toast("Veri okuma hatası: " + res.message);
+  },
+
+  async importFile(type) {
+    const files = await api().pick_files(["Spreadsheet Files (*.xlsx;*.xls;*.csv)", "All files (*.*)"], type === "picklist");
+    if (!files || files.length === 0) return;
+    
+    let res;
+    if (type === "master") res = await api().inv_import_master_excel(files[0]);
+    else if (type === "picklist") res = await api().inv_import_picklist(files);
+    else if (type === "stock") res = await api().inv_import_stock(files[0]);
+
+    if (res.ok) { toast(res.message); this.reloadData(); }
+    else toast("Hata: " + res.message);
+  },
+
+  async detectIDs() {
+    const files = await api().pick_files(["Spreadsheet Files (*.xlsx;*.xls;*.csv)", "All files (*.*)"], type === "picklist");
+    if (!files || !files.length) return;
+    const res = await api().inv_detect_missing_ids(files[0]);
+    if (res.ok) {
+      if (res.missing.length === 0) toast("Tüm ID'ler sistemde kayıtlı.");
+      else {
+        console.log("Eksik ID'ler:\n" + res.missing.join("\n"));
+        toast(`${res.missing.length} adet eksik ID bulundu. Console'u kontrol et.`);
+      }
+    } else toast("Hata: " + res.message);
+  },
+
+  async resetData() {
+    if (!confirm("Tüm FBA geçmişi ve stok verileri silinecek. Onaylıyor musun?")) return;
+    const res = await api().inv_reset_data();
+    if (res.ok) { toast(res.message); this.reloadData(); }
+  },
+
+  async exportExcel() {
+    const folder = await api().pick_folder();
+    if (!folder) return;
+    const res = await api().inv_export_excel(folder);
+    if (res.ok) toast("Rapor oluşturuldu: " + res.path);
+    else toast("Hata: " + res.message);
+  },
+
+  renderTables() {
+    this._renderSirali();
+    this._renderAnaliz();
+    this._renderStock();
+    this.applyFilters();
+  },
+
+  _renderSirali() {
+    const tbody = document.querySelector("#fba-table-sirali tbody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = this.data.sirali.map(r => {
+      const searchStr = `${r.shipment_name || ''} ${r.shipment_id || ''} ${r.sku || ''}`.replace(/"/g, '').toLowerCase();
+      
+      return `
+      <tr data-search="${searchStr}" data-skt="${r.days_remaining || 0}" data-amz="${r.amz_stock_days || 0}">
+        <td class="clickable-cell">${r.shipment_name}</td>
+        <td class="clickable-cell">${r.shipment_id}</td>
+        <td class="clickable-cell">${r.created_date}</td>
+        <td class="clickable-cell">${r.sku}</td>
+        <td class="clickable-cell" style="text-align:center;">${r.qty_shipped}</td>
+        <td class="clickable-cell">${r.exp_date_usa}</td>
+        <td class="clickable-cell">${r.exp_date_tur}</td>
+        <td class="clickable-cell" style="text-align:center;">${r.days_remaining}</td>
+        <td class="clickable-cell" style="text-align:center;">${r.amz_stock_days}</td>
+      </tr>
+    `}).join("");
+  },
+
+  _renderAnaliz() {
+    const tbody = document.querySelector("#fba-table-analiz tbody");
+    if (!tbody) return;
+    
+    const skuCounts = this.data.analiz.reduce((acc, r) => { acc[r.sku] = (acc[r.sku] || 0) + 1; return acc; }, {});
+
+    tbody.innerHTML = this.data.analiz.map(r => {
+      const isMultiple = skuCounts[r.sku] > 1;
+      const isCritical = r.days_remaining <= 180;
+      const hasStock = r.amz_stock_allocated > 0;
+      
+      const skuStyle = isMultiple ? 'background-color:#C6EFCE; color:#006100; font-weight:bold;' : '';
+      const stockStyle = hasStock ? 'background-color:#C6EFCE; color:#006100; font-weight:bold; text-align:center;' : 'text-align:center;';
+      const sktStyle = isCritical ? 'background-color:#FFCDD2; color:#B71C1C; font-weight:bold; text-align:center;' : 'text-align:center;';
+      
+      const searchStr = `${r.shipment_name || ''} ${r.shipment_id || ''} ${r.sku || ''}`.replace(/"/g, '').toLowerCase();
+
+      return `
+        <tr data-search="${searchStr}" data-skt="${r.days_remaining || 0}" data-amz="${r.amz_stock_days || 0}">
+          <td class="clickable-cell">${r.shipment_name}</td>
+          <td class="clickable-cell">${r.shipment_id}</td>
+          <td class="clickable-cell" style="${skuStyle}">${r.sku}</td>
+          <td class="clickable-cell" style="text-align:center;">${r.qty_shipped}</td>
+          <td class="clickable-cell" style="${stockStyle}">${r.amz_stock_allocated}</td>
+          <td class="clickable-cell" style="text-align:center;">${r.amz_stock_days}</td>
+          <td class="clickable-cell" style="${sktStyle}">${r.days_remaining}</td>
+          <td style="padding:0; min-width: 150px;">
+            <input type="text" class="fba-note-input" value="${(r.note || '').replace(/"/g, '&quot;')}" 
+                   data-id="${r.shipment_id}" data-sku="${r.sku}" data-exp="${r.exp_date_usa}"
+                   style="width:100%; height:100%; border:none; background:transparent; padding:8px; color:var(--text); outline:none;">
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    document.querySelectorAll(".fba-note-input").forEach(inp => {
+      inp.addEventListener("change", async (e) => {
+        const { id, sku, exp } = e.target.dataset;
+        await api().inv_update_note(id, sku, exp, e.target.value);
+        toast("Not güncellendi.");
+      });
+    });
+  },
+
+  _renderStock() {
+    const tbody = document.querySelector("#fba-table-amz tbody");
+    if (!tbody) return;
+    tbody.innerHTML = Object.entries(this.data.stock).map(([sku, qty]) => `
+      <tr data-search="${sku}">
+        <td class="clickable-cell">${sku}</td><td class="clickable-cell" style="text-align:center;">${qty}</td>
+      </tr>
+    `).join("");
+  },
+
+  applyFilters() {
+    const searchInput = document.getElementById("fba-search").value.trim();
+    const search = searchInput.toLowerCase();
+    
+    // Düzenli İfade (Regex) inşası - Güvenlik yalıtımı yapıldı
+    const regex = search ? new RegExp(`(${search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'gi') : null;
+    
+    const sktMinInput = document.getElementById("fba-skt-min").value;
+    const sktMin = sktMinInput === "" ? -999999 : parseInt(sktMinInput, 10);
+    const sktMaxInput = document.getElementById("fba-skt-max").value;
+    const sktMax = sktMaxInput === "" ? 999999 : parseInt(sktMaxInput, 10);
+    
+    const amzMinInput = document.getElementById("fba-amz-min").value;
+    const amzMin = amzMinInput === "" ? -999999 : parseInt(amzMinInput, 10);
+    const amzMaxInput = document.getElementById("fba-amz-max").value;
+    const amzMax = amzMaxInput === "" ? 999999 : parseInt(amzMaxInput, 10);
+
+    const highlightCell = (td) => {
+      if (td.querySelector('input')) return; // Input olan hücreyi (Not sütunu) asla bozma
+      
+      const originalText = td.dataset.orig || td.textContent;
+      if (!td.dataset.orig) td.dataset.orig = originalText;
+
+      if (!search) {
+          td.innerHTML = originalText;
+          return;
+      }
+      td.innerHTML = originalText.replace(regex, '<mark class="highlight">$1</mark>');
+    };
+
+    document.querySelectorAll("#fba-table-sirali tbody tr, #fba-table-analiz tbody tr").forEach(tr => {
+      const textMatch = !search || (tr.dataset.search && tr.dataset.search.includes(search));
+      const skt = parseInt(tr.dataset.skt, 10) || 0;
+      const amz = parseInt(tr.dataset.amz, 10) || 0;
+      
+      const isVisible = textMatch && (skt >= sktMin && skt <= sktMax) && (amz >= amzMin && amz <= amzMax);
+      tr.style.display = isVisible ? "" : "none";
+
+      if (isVisible) Array.from(tr.children).forEach(highlightCell);
+    });
+
+    document.querySelectorAll("#fba-table-amz tbody tr").forEach(tr => {
+      const textMatch = !search || (tr.dataset.search && tr.dataset.search.includes(search));
+      tr.style.display = textMatch ? "" : "none";
+      if (textMatch) Array.from(tr.children).forEach(highlightCell);
+    });
+  }
+};
 
 // Cost Updater
 const cuZone = new FileDropZone({ zoneId: "cu-dropzone", listId: "cu-file-list", multiple: false, fileTypes: ["CSV Files (*.csv)", "All files (*.*)"], accept: (p) => p.toLowerCase().endsWith(".csv") });
@@ -1093,6 +1319,44 @@ function renderCostUpdaterUI(data, isV2) {
   });
 }
 
+function FBATablesScrollHandler() {
+  const scrollContainers = document.querySelectorAll('.fba-tables');
+
+  scrollContainers.forEach(container => {
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    container.addEventListener('mousedown', (e) => {
+      // Eğer tıklanan şey bir input veya buton değilse kaydırmayı başlat
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+      
+      isDown = true;
+      container.classList.add('grab');
+      startX = e.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    });
+
+    container.addEventListener('mouseleave', () => {
+      isDown = false;
+      container.classList.remove('grab');
+    });
+
+    container.addEventListener('mouseup', () => {
+      isDown = false;
+      container.classList.remove('grab');
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - container.offsetLeft;
+      const walk = (x - startX) * 1.5; // Kaydırma hızı çarpanı (istersen artırıp azaltabilirsin)
+      container.scrollLeft = scrollLeft - walk;
+    });
+  });
+}
+
 document.getElementById("cu-version-toggle").addEventListener("change", loadCostUpdaterSettings);
 whenApiReady(loadCostUpdaterSettings);
 
@@ -1113,6 +1377,7 @@ document.getElementById("cu-run-btn").addEventListener("click", async () => {
 
 // Restock
 const EXCEL_TYPES = ["Excel Files (*.xlsx;*.xls)", "All files (*.*)"];
+const CSV_TYPE = ["CSV Files (*.csv)", "All files (*.*)"];
 const rsHamZone = new FileDropZone({ zoneId: "rs-ham-dropzone", listId: "rs-ham-file-list", fileTypes: EXCEL_TYPES, reorderable: true });
 const rsExportZone = new FileDropZone({ zoneId: "rs-export-dropzone", listId: "rs-export-file-list", fileTypes: EXCEL_TYPES });
 const rsRestockZone = new FileDropZone({ zoneId: "rs-restock-dropzone", listId: "rs-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
@@ -1280,6 +1545,16 @@ document.getElementById("exp-run-btn").addEventListener("click", async () => {
   await api().run_expiration(username, password, shipmentIds, outputFolder, document.getElementById("exp-remember-toggle").checked);
 });
 
+// PK EXTRACTOR
+
+const peCsvZone = new FileDropZone({ zoneId: "pe-csv-dropzone", listId: "pe-csv-file-list", multiple: false, fileTypes: CSV_TYPE });
+document.getElementById("pe-run-btn").addEventListener("click", async () => {
+  if (!peCsvZone.files.length) return toast("Fill all fields and drop files.");
+  prepareJobUI("pe");
+  await api().run_pk_extractor(peCsvZone.files[0]);
+});
+
+
 // Updates View
 const updatesView = {
   currentVersion: "",
@@ -1368,6 +1643,7 @@ whenApiReady(() => {
   }
 });
 whenApiReady(async () => {
+  FBATablesScrollHandler();
   restockEditor.load();
   orderEditor.load();
   invoiceEditor.load();
