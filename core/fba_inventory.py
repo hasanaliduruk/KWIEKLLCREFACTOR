@@ -1,10 +1,3 @@
-"""
-================================================================================
-FBA Expiration Date & FIFO Inventory Management System (ENTERPRISE PRO EDITION)
-Architecture: PySide6 Desktop GUI + SQLite Persistence Layer + Algorithmic FIFO Engine
-Stack: Python 3.13+, PySide6, Pandas, OpenPyXL, SQLite3
-================================================================================
-"""
 
 import os
 import sys
