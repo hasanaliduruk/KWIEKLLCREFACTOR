@@ -367,8 +367,16 @@ createThemeSwatches();
 document.querySelectorAll(".settings-tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".settings-tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".settings-tab-pane").forEach(t => t.classList.remove("active"))
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.target).classList.add("active");
+  });
+});
+
+document.querySelectorAll(".fba-tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".fba-tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".fba-tables").forEach(p => p.classList.remove("active"));
-    
     btn.classList.add("active");
     document.getElementById(btn.dataset.target).classList.add("active");
   });
@@ -934,6 +942,65 @@ const fbaManager = {
       filterInputs.forEach(id => document.getElementById(id).value = "");
       this.applyFilters();
     });
+
+    this.initDetectModal();
+    this._initSortableHeaders();
+  },
+
+  // Sort state per table
+  _sortState: {},
+
+  _initSortableHeaders() {
+    document.querySelectorAll(".data-table .sortable-th").forEach(th => {
+      th.addEventListener("click", () => {
+        const table = th.closest("table");
+        const tableId = table.id;
+        const col = parseInt(th.dataset.col, 10);
+        const type = th.dataset.type || "str";
+
+        const prev = this._sortState[tableId] || {};
+        const dir = (prev.col === col && prev.dir === "asc") ? "desc" : "asc";
+        this._sortState[tableId] = { col, dir };
+
+        // Update arrow indicators
+        table.querySelectorAll(".sortable-th").forEach(h => {
+          h.classList.remove("sort-asc", "sort-desc");
+        });
+        th.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
+
+        // Sort tbody rows
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a, b) => {
+          const aCell = a.cells[col];
+          const bCell = b.cells[col];
+          if (!aCell || !bCell) return 0;
+          const aVal = aCell.querySelector("input")?.value ?? aCell.dataset.orig ?? aCell.textContent.trim();
+          const bVal = bCell.querySelector("input")?.value ?? bCell.dataset.orig ?? bCell.textContent.trim();
+          let cmp = 0;
+          if (type === "num") {
+            cmp = (parseFloat(aVal) || 0) - (parseFloat(bVal) || 0);
+          } else {
+            cmp = aVal.localeCompare(bVal, "tr", { sensitivity: "base" });
+          }
+          return dir === "asc" ? cmp : -cmp;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+
+        // Re-index after sort
+        this._reIndexTable(table);
+      });
+    });
+  },
+
+  _reIndexTable(table) {
+    let idx = 1;
+    table.querySelectorAll("tbody tr").forEach(row => {
+      if (row.style.display !== "none") {
+        const firstCell = row.cells[0];
+        if (firstCell) firstCell.textContent = idx++;
+      }
+    });
   },
 
   async reloadData() {
@@ -957,17 +1024,96 @@ const fbaManager = {
     else toast("Hata: " + res.message);
   },
 
-  async detectIDs() {
-    const files = await api().pick_files(["Spreadsheet Files (*.xlsx;*.xls;*.csv)", "All files (*.*)"], type === "picklist");
-    if (!files || !files.length) return;
-    const res = await api().inv_detect_missing_ids(files[0]);
-    if (res.ok) {
-      if (res.missing.length === 0) toast("Tüm ID'ler sistemde kayıtlı.");
-      else {
-        console.log("Eksik ID'ler:\n" + res.missing.join("\n"));
-        toast(`${res.missing.length} adet eksik ID bulundu. Console'u kontrol et.`);
+  detectIDs() {
+    // Open the ID Tespit modal
+    const modal = document.getElementById("fba-detect-modal");
+    const textarea = document.getElementById("fba-detect-textarea");
+    const results = document.getElementById("fba-detect-results");
+    if (!modal) return;
+    textarea.value = "";
+    results.style.display = "none";
+    modal.style.display = "flex";
+    setTimeout(() => textarea.focus(), 100);
+  },
+
+  async runDetectAnalysis() {
+    const textarea = document.getElementById("fba-detect-textarea");
+    const rawText = textarea.value.trim();
+    if (!rawText) { toast("Lütfen metin yapıştırın."); return; }
+
+    const fbaPattern = /\b(FBA[A-Z0-9]{8,12})\b/gi;
+    const matches = rawText.match(fbaPattern) || [];
+    const extractedSet = new Set(matches.map(id => id.toUpperCase()));
+    const extracted = [...extractedSet];
+
+    if (extracted.length === 0) {
+      toast("Metinde FBA Shipment ID tespit edilemedi.");
+      return;
+    }
+
+    const res = await api().inv_detect_missing_ids_from_text(extracted);
+
+    const summaryEl = document.getElementById("fba-detect-summary");
+    const missingBlock = document.getElementById("fba-detect-missing-block");
+    const missingList = document.getElementById("fba-detect-missing-list");
+    const resultsEl = document.getElementById("fba-detect-results");
+
+    if (!res.ok) { toast("Hata: " + res.message); return; }
+
+    const totalExtracted = extracted.length;
+    const missingCount = res.missing.length;
+    const registeredCount = totalExtracted - missingCount;
+
+    // Yeni Grid İstatistik Paneli
+    summaryEl.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center;">
+         <span style="font-size: 11px; color: var(--text-faint); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Tespit Edilen</span>
+         <strong style="font-size: 22px; color: var(--text); margin-top: 4px;">${totalExtracted}</strong>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; border-left: 1px solid var(--line); border-right: 1px solid var(--line);">
+         <span style="font-size: 11px; color: var(--text-faint); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Kayıtlı</span>
+         <strong style="font-size: 22px; color: var(--ok); margin-top: 4px;">${registeredCount}</strong>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center;">
+         <span style="font-size: 11px; color: var(--text-faint); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Eksik</span>
+         <strong style="font-size: 22px; color: ${missingCount > 0 ? 'var(--err)' : 'var(--ok)'}; margin-top: 4px;">${missingCount}</strong>
+      </div>
+    `;
+
+    if (missingCount > 0) {
+      missingList.value = res.missing.join("\n");
+      missingBlock.style.display = "flex"; // CSS düzenine uygun flex gösterim
+    } else {
+      missingBlock.style.display = "none";
+    }
+
+    resultsEl.style.display = "block";
+  },
+
+  initDetectModal() {
+    const modal = document.getElementById("fba-detect-modal");
+    const closeBtn = document.getElementById("fba-detect-modal-close");
+    const runBtn = document.getElementById("fba-detect-run-btn");
+    const copyBtn = document.getElementById("fba-detect-copy-btn");
+
+    // Sadece Çarpı (X) butonuna tıklandığında kapatır
+    closeBtn?.addEventListener("click", () => { modal.style.display = "none"; });
+    
+    // modal?.addEventListener("click", ...) SİLİNDİ: Artık boşluğa tıklayınca kapanmaz.
+    
+    runBtn?.addEventListener("click", () => this.runDetectAnalysis());
+    
+    copyBtn?.addEventListener("click", () => {
+      const list = document.getElementById("fba-detect-missing-list").value;
+      if (list) { 
+        navigator.clipboard.writeText(list); 
+        toast("📋 Eksik ID'ler panoya kopyalandı!"); 
+        
+        // Buton efektini geri besle
+        copyBtn.textContent = "Kopyalandı ✓";
+        setTimeout(() => copyBtn.textContent = "📋 Panoya Kopyala", 1500);
       }
-    } else toast("Hata: " + res.message);
+    });
   },
 
   async resetData() {
@@ -995,11 +1141,12 @@ const fbaManager = {
     const tbody = document.querySelector("#fba-table-sirali tbody");
     if (!tbody) return;
     
-    tbody.innerHTML = this.data.sirali.map(r => {
+    tbody.innerHTML = this.data.sirali.map((r, i) => {
       const searchStr = `${r.shipment_name || ''} ${r.shipment_id || ''} ${r.sku || ''}`.replace(/"/g, '').toLowerCase();
       
       return `
       <tr data-search="${searchStr}" data-skt="${r.days_remaining || 0}" data-amz="${r.amz_stock_days || 0}">
+        <td class="col-index">${i + 1}</td>
         <td class="clickable-cell">${r.shipment_name}</td>
         <td class="clickable-cell">${r.shipment_id}</td>
         <td class="clickable-cell">${r.created_date}</td>
@@ -1019,7 +1166,7 @@ const fbaManager = {
     
     const skuCounts = this.data.analiz.reduce((acc, r) => { acc[r.sku] = (acc[r.sku] || 0) + 1; return acc; }, {});
 
-    tbody.innerHTML = this.data.analiz.map(r => {
+    tbody.innerHTML = this.data.analiz.map((r, i) => {
       const isMultiple = skuCounts[r.sku] > 1;
       const isCritical = r.days_remaining <= 180;
       const hasStock = r.amz_stock_allocated > 0;
@@ -1032,6 +1179,7 @@ const fbaManager = {
 
       return `
         <tr data-search="${searchStr}" data-skt="${r.days_remaining || 0}" data-amz="${r.amz_stock_days || 0}">
+          <td class="col-index">${i + 1}</td>
           <td class="clickable-cell">${r.shipment_name}</td>
           <td class="clickable-cell">${r.shipment_id}</td>
           <td class="clickable-cell" style="${skuStyle}">${r.sku}</td>
@@ -1060,9 +1208,11 @@ const fbaManager = {
   _renderStock() {
     const tbody = document.querySelector("#fba-table-amz tbody");
     if (!tbody) return;
-    tbody.innerHTML = Object.entries(this.data.stock).map(([sku, qty]) => `
+    tbody.innerHTML = Object.entries(this.data.stock).map(([sku, qty], i) => `
       <tr data-search="${sku}">
-        <td class="clickable-cell">${sku}</td><td class="clickable-cell" style="text-align:center;">${qty}</td>
+        <td class="col-index">${i + 1}</td>
+        <td class="clickable-cell">${sku}</td>
+        <td class="clickable-cell" style="text-align:center;">${qty}</td>
       </tr>
     `).join("");
   },
@@ -1469,7 +1619,6 @@ const mainInvoiceEditor = new JSONConfigEditor("inv-settings-main-container", "i
 ]);
 document.getElementById("inv-run-btn").addEventListener("click", async () => {
   const outputFolder = document.getElementById("inv-output-folder").value.trim();
-  const settingsContent = document.getElementById("inv-settings").value;
   if (!outputFolder || !invZone.files.length) return toast("Drop files and select destination.");
   await api().save_settings("invoice_settings.json", JSON.stringify(invoiceEditor.data));
   prepareJobUI("inv");
@@ -1567,6 +1716,7 @@ const updatesView = {
     document.getElementById("updates-notes-btn")?.addEventListener("click", () => {
       const rawNotes = this.latestData?.notes || "No notes.";
       document.getElementById("if-instructions-body").innerHTML = parseMarkdown(rawNotes);
+      document.getElementById("if-instructions-title").innerHTML = `Release Notes | ${this.currentVersion}`
       document.getElementById("if-instructions-modal").classList.add("visible");
     });
   },
@@ -1653,6 +1803,7 @@ whenApiReady(async () => {
 // =======================================================================
 // FLUID LAYOUT ZOOM & SCROLL FIX (Ctrl + Scroll / Ctrl + Keys)
 // =======================================================================
+
 let currentZoom = 1.0;
 
 function updateAppZoom(newZoom, save = true) {

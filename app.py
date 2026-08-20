@@ -33,7 +33,7 @@ from core.expiration_processor import process_expiration
 from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
 from core.pk_extractor import PKExtractorEngine
 
-CURRENT_VERSION = "v1.3.5"
+CURRENT_VERSION = "v1.3.6"
 GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,6 +55,32 @@ else:
 
 SETTINGS_DIR = os.path.join(SETTINGS_BASE_DIR, "Settings")
 os.makedirs(SETTINGS_DIR, exist_ok=True)
+
+WINDOW_STATE_FILE = os.path.join(SETTINGS_DIR, "window_state.json")
+
+def load_window_state():
+    try:
+        if os.path.exists(WINDOW_STATE_FILE):
+            with open(WINDOW_STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    # Varsayılan ilk açılış değerleri
+    return {"width": 1280, "height": 860, "x": None, "y": None, "maximized": False}
+
+def save_window_state(window, is_maximized):
+    try:
+        state = {
+            "width": window.width,
+            "height": window.height,
+            "x": window.x,
+            "y": window.y,
+            "maximized": is_maximized
+        }
+        with open(WINDOW_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+    except Exception:
+        pass
 
 DEFAULT_SETTINGS = {
     "costupdater_settings.json": {
@@ -489,6 +515,19 @@ class Api:
         try:
             extracted = ShipmentIDExtractor.extract_shipment_ids_from_file(file_path)
             if not extracted: return {"ok": False, "message": "FBA Shipment ID tespit edilemedi."}
+            db = self._get_inventory_db()
+            registered = db.get_all_registered_shipment_ids()
+            missing = sorted(list(extracted - registered))
+            return {"ok": True, "extracted": len(extracted), "missing": missing}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+
+    def inv_detect_missing_ids_from_text(self, extracted_ids_list):
+        """Accepts a list of FBA IDs (already extracted client-side) and checks which are missing from the DB."""
+        try:
+            extracted = set(i.upper().strip() for i in extracted_ids_list if i)
+            if not extracted:
+                return {"ok": False, "message": "Geçerli FBA Shipment ID bulunamadı."}
             db = self._get_inventory_db()
             registered = db.get_all_registered_shipment_ids()
             missing = sorted(list(extracted - registered))
@@ -1047,30 +1086,55 @@ def main():
                 ctypes.windll.user32.SetProcessDPIAware()
             except Exception:
                 pass
+        os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--force-device-scale-factor=1"
     ensure_default_settings()
 
     api = Api()
     index_path = os.path.join(APP_DIR, "gui_web", "index.html")
     icon_path = get_asset_path("icon.ico")
 
+    state = load_window_state()
+
     window = webview.create_window(
         "Operations Toolkit",
         index_path,
         js_api=api,
-        width=1280,
-        height=860,
+        width=state.get("width", 1280),
+        height=state.get("height", 860),
+        x=state.get("x"),
+        y=state.get("y"),
         min_size=(960, 640),
         background_color="#15171c"
     )
     api.set_window(window)
 
+    window_status = {"is_maximized": state.get("maximized", False)}
+
+    def on_maximized():
+        window_status["is_maximized"] = True
+
+    def on_restored():
+        window_status["is_maximized"] = False
+
+    # Pencere kapanırken son durumu (koordinatları ve boyutu) diske yaz
+    def on_closing():
+        save_window_state(window, window_status["is_maximized"])
+
     def on_loaded():
         api.bind_dropzones()
         _inject_icon_data_uri(window, icon_path)
         api.run_silent_update_check()
+        
+        # Eğer uygulama en son tam ekran (maximize) olarak kapatıldıysa, tekrar o şekilde başlat
+        if window_status["is_maximized"]:
+            window.maximize()
 
+    window.events.maximized += on_maximized
+    window.events.restored += on_restored
+    window.events.closing += on_closing
     window.events.loaded += on_loaded
-    webview.start(debug=True, icon=icon_path)
+
+    webview.start(debug=False, icon=icon_path)
 
 if __name__ == "__main__":
     main()
