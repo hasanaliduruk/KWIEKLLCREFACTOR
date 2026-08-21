@@ -33,7 +33,7 @@ from core.expiration_processor import process_expiration
 from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
 from core.pk_extractor import PKExtractorEngine
 
-CURRENT_VERSION = "v1.3.6"
+CURRENT_VERSION = "v1.3.7"
 GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,20 +67,6 @@ def load_window_state():
         pass
     # Varsayılan ilk açılış değerleri
     return {"width": 1280, "height": 860, "x": None, "y": None, "maximized": False}
-
-def save_window_state(window, is_maximized):
-    try:
-        state = {
-            "width": window.width,
-            "height": window.height,
-            "x": window.x,
-            "y": window.y,
-            "maximized": is_maximized
-        }
-        with open(WINDOW_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(state, f)
-    except Exception:
-        pass
 
 DEFAULT_SETTINGS = {
     "costupdater_settings.json": {
@@ -1074,6 +1060,114 @@ def _inject_icon_data_uri(window, icon_path):
     except Exception:
         pass
 
+def get_virtual_screen_bounds():
+    """
+    Sisteme bağlı tüm monitörlerin oluşturduğu birleşik sanal ekranın (Virtual Screen) 
+    minimum ve maksimum (X, Y) sınırlarını işletim sistemi seviyesinde tespit eder.
+    """
+    if platform.system() == "Windows":
+        try:
+            # SM_XVIRTUALSCREEN (76), SM_YVIRTUALSCREEN (77)
+            # SM_CXVIRTUALSCREEN (78), SM_CYVIRTUALSCREEN (79)
+            user32 = ctypes.windll.user32
+            x = user32.GetSystemMetrics(76)
+            y = user32.GetSystemMetrics(77)
+            w = user32.GetSystemMetrics(78)
+            h = user32.GetSystemMetrics(79)
+            return x, y, x + w, y + h
+        except Exception:
+            pass
+            
+    # Windows değilse veya ctypes başarısız olursa Pywebview'in ekran motoruna başvur
+    try:
+        if webview.screens:
+            min_x = min(s.x for s in webview.screens)
+            min_y = min(s.y for s in webview.screens)
+            max_x = max(s.x + s.width for s in webview.screens)
+            max_y = max(s.y + s.height for s in webview.screens)
+            return min_x, min_y, max_x, max_y
+    except Exception:
+        pass
+        
+    # Her şey çökerse güvenlik ağı
+    return -8000, -4000, 8000, 4000
+
+def validate_window_state(state):
+    """
+    Kayıtlı pencere durumunu gerçek işletim sistemi ekran sınırlarına ve tip hatalarına karşı denetler.
+    """
+    # 1. Tip Güvenliği: Değerler None veya String gelirse varsayılana döndür
+    try:
+        w = int(state.get("width") or 1280)
+    except (TypeError, ValueError):
+        w = 1280
+        
+    try:
+        h = int(state.get("height") or 860)
+    except (TypeError, ValueError):
+        h = 860
+
+    x = state.get("x")
+    y = state.get("y")
+    maximized = state.get("maximized", False)
+
+    # 2. Gerçek Ekran Topolojisini Al
+    min_x, min_y, max_x, max_y = get_virtual_screen_bounds()
+    
+    # Sanal ekranın toplam genişlik ve yüksekliği
+    screen_total_width = max_x - min_x
+    screen_total_height = max_y - min_y
+
+    # 3. Dinamik Boyut Sınırlandırması 
+    # Genişlik ve Yükseklik, mevcut ekranın fiziksel sınırlarını aşamaz.
+    w = max(960, min(w, screen_total_width))
+    h = max(640, min(h, screen_total_height))
+
+    # 4. Hayalet Ekran (Off-screen) Koruması
+    if x is not None:
+        try:
+            x = int(x)
+            if x < min_x or x > max_x - 100:
+                x = None
+        except (TypeError, ValueError):
+            x = None
+            
+    if y is not None:
+        try:
+            y = int(y)
+            if y < min_y or y > max_y - 100:
+                y = None
+        except (TypeError, ValueError):
+            y = None
+
+    return w, h, x, y, maximized
+
+def save_window_state(window, is_maximized):
+    try:
+        # 1. API'den gelen ham değerleri al
+        raw_state = {
+            "width": window.width,
+            "height": window.height,
+            "x": window.x,
+            "y": window.y,
+            "maximized": is_maximized
+        }
+        
+        # 2. Diske yazmadan önce çöp veriyi temizle
+        w, h, x, y, is_max = validate_window_state(raw_state)
+        
+        clean_state = {
+            "width": w,
+            "height": h,
+            "x": x,
+            "y": y,
+            "maximized": is_max
+        }
+        
+        with open(WINDOW_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(clean_state, f)
+    except Exception:
+        pass
 
 def main():
     if platform.system() == "Windows":
@@ -1087,28 +1181,33 @@ def main():
             except Exception:
                 pass
         os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--force-device-scale-factor=1"
+    
     ensure_default_settings()
 
     api = Api()
     index_path = os.path.join(APP_DIR, "gui_web", "index.html")
     icon_path = get_asset_path("icon.ico")
 
+    # Bellekten durumu çek ve güvenlik filtresinden geçir
     state = load_window_state()
+    w, h, x, y, is_max = validate_window_state(state)
 
+    # Pencereyi doğrudan filtrelenmiş verilerle ve tam ekran bilgisiyle (flicker olmadan) oluştur
     window = webview.create_window(
         "Operations Toolkit",
         index_path,
         js_api=api,
-        width=state.get("width", 1280),
-        height=state.get("height", 860),
-        x=state.get("x"),
-        y=state.get("y"),
+        width=w,
+        height=h,
+        x=x,
+        y=y,
         min_size=(960, 640),
-        background_color="#15171c"
+        background_color="#15171c",
+        maximized=is_max
     )
     api.set_window(window)
 
-    window_status = {"is_maximized": state.get("maximized", False)}
+    window_status = {"is_maximized": is_max}
 
     def on_maximized():
         window_status["is_maximized"] = True
@@ -1116,7 +1215,7 @@ def main():
     def on_restored():
         window_status["is_maximized"] = False
 
-    # Pencere kapanırken son durumu (koordinatları ve boyutu) diske yaz
+    # Pencere kapanırken son durumu diske yaz
     def on_closing():
         save_window_state(window, window_status["is_maximized"])
 
@@ -1124,10 +1223,7 @@ def main():
         api.bind_dropzones()
         _inject_icon_data_uri(window, icon_path)
         api.run_silent_update_check()
-        
-        # Eğer uygulama en son tam ekran (maximize) olarak kapatıldıysa, tekrar o şekilde başlat
-        if window_status["is_maximized"]:
-            window.maximize()
+        # DİKKAT: window.maximize() buradan tamamen kaldırıldı! İşletim sistemi bu işi zaten yaptı.
 
     window.events.maximized += on_maximized
     window.events.restored += on_restored

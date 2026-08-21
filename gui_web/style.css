@@ -1044,12 +1044,14 @@ a { color: var(--accent); }
   display: flex;
   flex-direction: column;
   padding: 14px 8px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   width: 52px;
   transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
   position: relative;
   z-index: 50;
 }
+.sidebar::-webkit-scrollbar { display: none; }
 
 /* When sidebar is expanded via hover, also update the grid layout via JS */
 
@@ -1112,6 +1114,7 @@ a { color: var(--accent); }
   align-items: center;
   gap: 10px;
   padding: 4px 6px 18px;
+  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -1152,11 +1155,13 @@ a { color: var(--accent); }
   white-space: nowrap;
   overflow: hidden;
   pointer-events: none;
+  flex-shrink: 0;
   transition: opacity 0.15s ease, max-height 0.22s cubic-bezier(0.4,0,0.2,1), padding 0.22s cubic-bezier(0.4,0,0.2,1);
 }
 
 .nav-item {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 10px;
   padding: 9px 8px;
@@ -1190,6 +1195,7 @@ a { color: var(--accent); }
 
 .sidebar-footer {
   margin-top: auto;
+  flex-shrink: 0;
   padding: 10px;
   font-size: 11px;
   color: var(--text-faint);
@@ -2132,6 +2138,7 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   .nav-group-label {
     opacity: 1;
     max-height: 40px;
+    min-height: 30px;
     padding: 14px 10px 6px;
     pointer-events: auto;
     transition: opacity 0.18s ease 0.1s, max-height 0.22s cubic-bezier(0.4,0,0.2,1), padding 0.22s cubic-bezier(0.4,0,0.2,1);
@@ -2156,6 +2163,7 @@ textarea.settings-box:focus { border-color: var(--accent-dim); }
   .nav-group-label {
     opacity: 1;
     max-height: 40px;
+    min-height: 30px;
     padding: 14px 10px 6px;
     pointer-events: auto;
     transition: opacity 0.18s ease 0.1s, max-height 0.22s cubic-bezier(0.4,0,0.2,1), padding 0.22s cubic-bezier(0.4,0,0.2,1);

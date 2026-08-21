@@ -171,5 +171,5 @@ def process_costupdater(
     return {
         "status": "success",
         "message": f"V{version} İşlemi Vektörel Olarak Başarıyla Tamamlandı!",
-        "output_path": output_path,
+        "output_path": output_folder,
     }
