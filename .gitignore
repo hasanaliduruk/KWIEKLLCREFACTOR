@@ -26,6 +26,7 @@ gui/
 main.py
 Settings/*.json
 Settings/*.txt
+Settings/*.db
 build_tkinter.spec
 .VSCodeCounter/
 .venv12/
