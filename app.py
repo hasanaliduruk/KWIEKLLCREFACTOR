@@ -33,7 +33,7 @@ from core.expiration_processor import process_expiration
 from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
 from core.pk_extractor import PKExtractorEngine
 
-CURRENT_VERSION = "v1.3.8"
+CURRENT_VERSION = "v1.3.9"
 GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
