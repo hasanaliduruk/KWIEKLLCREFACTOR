@@ -127,4 +127,4 @@ class PKExtractorEngine:
                 w.writerow(new_header)
                 w.writerows(out_rows)
 
-        return total, modified, out_path
+        return total, modified, os.path.dirname(out_path)

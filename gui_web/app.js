@@ -57,11 +57,11 @@ function parseMarkdown(text) {
 // EVRENSEL JSON AYAR EDİTÖRÜ (Universal Config Editor)
 // =======================================================================
 class JSONConfigEditor {
-  constructor(containerId, fileName, configSchema) {
+  constructor(containerId, fileName, title, configSchema) {
     this.containerId = containerId;
     this.fileName = fileName;
+    this.title = title;
     this.configSchema = configSchema; 
-    // configSchema Formatı: [{ key: "columns", title: "Sütunlar", type: "tags" }, { key: "deposits", title: "Maliyetler", type: "key-value" }]
     this.data = {};
   }
 
@@ -73,23 +73,30 @@ class JSONConfigEditor {
       this.data = {};
     }
     
-    // JSON'da eksik anahtar varsa otomatik oluştur
     this.configSchema.forEach(sec => {
       if (!this.data[sec.key]) this.data[sec.key] = {};
     });
     this.render();
   }
 
-  render() {
+  // newlyAdded = son eklenen anahtarı (animasyon için) takip eder
+  render(newlyAdded = null) {
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
-    let html = ``;
+    let html = `
+    <div style="display: flex; align-items: center;">
+      <div class="card-title" style="margin-bottom: 0;">${this.title}</div>
+      <div style="margin-left: auto;">
+        <button class="btn btn-sm btn-revert" style="padding:10px 14px; margin-right:8px;" title="Unsaved changes will be lost">Revert</button>
+        <button class="btn btn-sm btn-save" style="padding:10px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
+      </div>
+    </div>
+    <div class="divider"></div>`;
 
     this.configSchema.forEach(sec => {
-      html += `<div class="card-title" style="margin-bottom:14px;">${sec.title}</div>`;
-      
       if (sec.type === "tags") {
+        html += `<div class="card-title" style="margin-bottom:14px;">${sec.title}</div>`;
         html += `<div class="row-2">`;
         for (const [colName, valArray] of Object.entries(this.data[sec.key])) {
           let chips = (valArray || []).map(v => `<span class="file-chip" style="margin:2px; padding:3px 6px; border-color:var(--accent);"><span class="file-chip-name">${v}</span><span class="file-chip-remove" data-sec="${sec.key}" data-col="${colName}" data-val="${v}" style="margin-left:4px;">&times;</span></span>`).join('');
@@ -104,10 +111,29 @@ class JSONConfigEditor {
         }
         html += `</div>`;
       } else if (sec.type === "key-value") {
-        html += `<div class="row-2" style="margin-bottom:14px;">`;
+        // Ekleme formunu (Add) listenin en üstüne aldık
+        html += `
+        <div style="display: flex; align-items: center; margin-bottom:14px; margin-top: 4px;">
+          <div class="card-title" style="margin-bottom: 0;">${sec.title}</div>
+          <div style="display:flex; gap:8px; margin-left: auto;">
+            <input type="text" class="text-input new-kv-key" data-sec="${sec.key}" placeholder="New Item..." style="width:160px; font-size:12.8px; padding:6px 11px;" />
+            <button class="btn btn-primary btn-add-kv" data-sec="${sec.key}" style="padding:6px 14px;">Add</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row-2" style="margin-bottom:14px;">`;
+        
         for (const [k, v] of Object.entries(this.data[sec.key])) {
+          // Yeni eklenen karta belirgin çerçeve ve animasyon uygula
+          const isNew = (k === newlyAdded);
+          const styleStr = isNew 
+            ? `background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); margin-bottom: auto; border: 2px solid var(--accent); box-shadow: 0 0 12px var(--accent-soft);` 
+            : `background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: auto;`;
+          
+          const animClass = isNew ? "anim-pop" : "";
+
           html += `
-            <div class="field anim-pop" style="background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: auto;">
+            <div class="field ${animClass}" style="${styleStr}">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <label class="field-label" style="margin-bottom: 0; font-weight: 600;">${k}</label>
                 <button class="btn-delete-kv" data-sec="${sec.key}" data-key="${k}" style="background: transparent; border:none; color:var(--err); cursor:pointer; font-size:16px; line-height:1; padding: 2px 4px;" title="Sil">&times;</button>
@@ -115,24 +141,30 @@ class JSONConfigEditor {
               <input type="number" step="0.01" class="kv-input text-input" data-sec="${sec.key}" data-key="${k}" value="${v}" />
             </div>`;
         }
-        html += `</div>
-        <div style="display:flex; gap:8px; margin-bottom:14px;">
-          <input type="text" class="text-input new-kv-key" data-sec="${sec.key}" placeholder="New Warehouse" style="width:160px; font-size:12.8px; padding:6px 11px;" />
-          <button class="btn btn-primary btn-add-kv" data-sec="${sec.key}" style="padding:6px 14px;">Add</button>
-        </div><div class="divider"></div>`;
+        html += `</div>`;
       }
     });
+
+    // Kaydet/Geri Al butonlarını listenin en altına da kopyalıyoruz
     html += `
+    <div class="divider"></div>
     <div style="display:flex; justify-content:flex-end; align-items:center;">
       <div style="display:flex;">
-        <button class="btn btn-sm btn-revert" style="padding:6px 14px; margin-right:8px;" title="Unsaved changes will be lost">Revert</button>
-        <button class="btn btn-sm btn-save" style="padding:6px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
+        <button class="btn btn-sm btn-revert" style="padding:10px 14px; margin-right:8px;" title="Unsaved changes will be lost">Revert</button>
+        <button class="btn btn-sm btn-save" style="padding:10px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
       </div>
     </div>`;
-    
 
     container.innerHTML = html;
     this.attachEvents(container);
+    
+    // Eğer yeni eleman eklendiyse sayfayı otomatik ona kaydır
+    if (newlyAdded) {
+      setTimeout(() => {
+        const popEl = container.querySelector(".anim-pop");
+        if (popEl) popEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+    }
   }
 
   attachEvents(container) {
@@ -203,24 +235,31 @@ class JSONConfigEditor {
         const input = container.querySelector(`.new-kv-key[data-sec="${sec}"]`);
         const newKey = input.value.trim();
         if (newKey && this.data[sec][newKey] === undefined) {
-          this.data[sec][newKey] = 0;
-          this.render();
+          // OBJEYİ YENİDEN İNŞA ET: Yeni anahtarı başa (Top) koyuyoruz
+          this.data[sec] = { [newKey]: 0, ...this.data[sec] };
+          this.render(newKey);
         } else if (newKey) {
           toast("Bu anahtar zaten mevcut.");
         }
       });
     });
-    container.querySelector(".btn-save").addEventListener("click", async (e) => {
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      await api().save_settings(this.fileName, JSON.stringify(this.data));
-      toast("Ayarlar diske kaydedildi.");
-      btn.disabled = false;
+
+    // querySelectorAll kullanarak hem üstteki hem alttaki Save butonlarına işlev kazandırıyoruz
+    container.querySelectorAll(".btn-save").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const btns = container.querySelectorAll(".btn-save");
+        btns.forEach(b => b.disabled = true);
+        await api().save_settings(this.fileName, JSON.stringify(this.data));
+        toast("Ayarlar diske kaydedildi.");
+        btns.forEach(b => b.disabled = false);
+      });
     });
 
-    container.querySelector(".btn-revert").addEventListener("click", () => {
-      this.load();
-      toast("Değişiklikler geri alındı.");
+    container.querySelectorAll(".btn-revert").forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.load();
+        toast("Değişiklikler geri alındı.");
+      });
     });
   }
 }
@@ -1269,203 +1308,229 @@ const fbaManager = {
 // Cost Updater
 const cuZone = new FileDropZone({ zoneId: "cu-dropzone", listId: "cu-file-list", multiple: false, fileTypes: ["CSV Files (*.csv)", "All files (*.*)"], accept: (p) => p.toLowerCase().endsWith(".csv") });
 
-let currentCuSettings = {};
+// =======================================================================
+// COST UPDATER (V1 & V2) SETTINGS YÖNETİMİ
+// =======================================================================
+let currentCuSettingsV1 = { columns: {}, warehouses: {} };
+let currentCuSettingsV2 = { columns: {}, warehouses: {} };
 
 async function loadCostUpdaterSettings() {
-  const isV2 = document.getElementById("cu-version-toggle").checked;
-  const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
-  
-  const rawData = await api().get_settings(fileName);
   try {
-    currentCuSettings = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
-  } catch (e) {
-    currentCuSettings = { columns: {}, warehouses: {} };
-  }
+    const rawV1 = await api().get_settings("costupdater_settings.json");
+    currentCuSettingsV1 = typeof rawV1 === "string" ? JSON.parse(rawV1) : rawV1;
+  } catch (e) { currentCuSettingsV1 = { columns: {}, warehouses: {} }; }
   
-  renderCostUpdaterUI(currentCuSettings, isV2);
+  try {
+    const rawV2 = await api().get_settings("costupdater2_settings.json");
+    currentCuSettingsV2 = typeof rawV2 === "string" ? JSON.parse(rawV2) : rawV2;
+  } catch (e) { currentCuSettingsV2 = { columns: {}, warehouses: {} }; }
+  
+  const toggle = document.getElementById("cu-version-toggle");
+  const isV2Tool = toggle ? toggle.checked : false;
+
+  renderSingleCuUI('cu-settings-container', isV2Tool ? currentCuSettingsV2 : currentCuSettingsV1, isV2Tool, isV2Tool ? "Cost Updater V2 Settings" : "Cost Updater Settings");
+  renderSingleCuUI('cu-settings-main-container', currentCuSettingsV1, false, "Cost Updater Settings");
+  renderSingleCuUI('cuv2-settings-main-container', currentCuSettingsV2, true, "Cost Updater V2 Settings");
 }
 
-function renderCostUpdaterUI(data, isV2) {
-  ['cu-settings-container', 'cu-settings-main-container'].forEach(containerId => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
+function renderSingleCuUI(containerId, data, isV2, title, newlyAdded = null) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  let html = `
+    <div style="display: flex; align-items: center;">
+      <div class="card-title" style="margin-bottom: 0;">${title}</div>
+      <div style="margin-left: auto;">
+        <button class="btn btn-sm btn-revert-cu-settings" style="padding:10px 14px; margin-right:8px;" title="Unsaved changes will be lost">Revert</button>
+        <button class="btn btn-sm btn-save-cu-settings" style="padding:10px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="card-title" style="margin-top:4px;">Sütun Eşleştirmeleri</div>
+    <p class="muted" style="margin-top:-8px; margin-bottom:14px;">Alternatif isimleri yazıp Enter tuşuna basarak etiket (chip) olarak ekleyin.</p>
+    <div class="row-2">`;
     
-    let html = `<div class="card-title" style="margin-top:4px;">Sütun Eşleştirmeleri</div>`;
-    html += `<p class="muted" style="margin-top:-8px; margin-bottom:14px;">Alternatif isimleri yazıp Enter tuşuna basarak etiket (chip) olarak ekleyin. Eşleşen ilk sütun kullanılacaktır.</p><div class="row-2">`;
+  for (const [key, val] of Object.entries(data.columns || {})) {
+    let chips = (val || []).map(v => `<span class="file-chip" style="margin:2px; padding:3px 6px; border-color:var(--accent);"><span class="file-chip-name">${v}</span><span class="file-chip-remove" data-col="${key}" data-val="${v}" style="margin-left:4px;">&times;</span></span>`).join('');
+    html += `
+      <div class="field">
+        <label class="field-label">${key.toUpperCase()}</label>
+        <div class="tags-wrapper" style="display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--panel-raised); border:1px solid var(--line); border-radius:var(--radius-sm); min-height:36px; align-items:center;">
+          ${chips}
+          <input type="text" class="tag-input" data-col="${key}" style="border:none; background:transparent; outline:none; color:var(--text); flex:1; min-width:80px; font-size:12px;" placeholder="Add and press Enter..." />
+        </div>
+      </div>`;
+  }
     
-    for (const [key, val] of Object.entries(data.columns || {})) {
-      let chips = (val || []).map(v => `<span class="file-chip" style="margin:2px; padding:3px 6px; border-color:var(--accent);"><span class="file-chip-name">${v}</span><span class="file-chip-remove" data-col="${key}" data-val="${v}" style="margin-left:4px;">&times;</span></span>`).join('');
+  // Ekleme bölümünü listenin en üstüne taşıdık
+  html += `</div><div class="divider"></div>
+      <div style="display: flex; align-items: center; margin-bottom:14px; margin-top: 4px;">
+        <div class="card-title" style="margin-bottom: 0;">WAREHOUSE COSTS</div>
+        <div style="display:flex; gap:8px; margin-left: auto;">
+          <input type="text" class="text-input new-wh-input" placeholder="New Warehouse (e.g., TX)" style="width:160px; font-size:12.8px; padding:6px 11px;" />
+          <button class="btn btn-primary btn-add-warehouse" style="padding:6px 14px;">Add</button>
+        </div>
+      </div>
+      <div class="row-2">`;
+    
+  for (const [wh, costData] of Object.entries(data.warehouses || {})) {
+    const isNew = (wh === newlyAdded);
+    const styleStr = isNew 
+      ? `grid-column: ${isV2 ? 'span 2' : 'span 1'}; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 2px solid var(--accent); box-shadow: 0 0 12px var(--accent-soft); position:relative; margin-bottom: auto;` 
+      : `grid-column: ${isV2 ? 'span 2' : 'span 1'}; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); position:relative; margin-bottom: auto;`;
+    
+    const animClass = isNew ? "anim-pop" : "";
+
+    if (isV2) {
       html += `
-        <div class="field">
-          <label class="field-label">${key.toUpperCase()}</label>
-          <div class="tags-wrapper" style="display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--panel-raised); border:1px solid var(--line); border-radius:var(--radius-sm); min-height:36px; align-items:center;">
-            ${chips}
-            <input type="text" class="tag-input" data-col="${key}" style="border:none; background:transparent; outline:none; color:var(--text); flex:1; min-width:80px; font-size:12px;" placeholder="Add and press Enter..." />
+        <div class="field ${animClass}" style="${styleStr}">
+          <button class="btn-delete-wh" data-wh="${wh}" style="position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:16px; line-height:1;" title="Delete Warehouse">&times;</button>
+          <label class="field-label" style="color: var(--text); font-weight: 600;">${wh} WAREHOUSE</label>
+          <div class="input-row" style="margin-top: 8px; align-items: flex-end;">
+            <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">Add. Cost</label><input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" data-prop="v2_additional_cost" value="${costData.v2_additional_cost ?? 0}" /></div>
+            <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">Equation</label>
+              <select class="select cu-wh-input" data-wh="${wh}" data-prop="v2_equation" style="width: 100%; padding: 9px 11px;">
+                <option value="1" ${costData.v2_equation === 1 ? 'selected' : ''}>1</option>
+                <option value="2" ${costData.v2_equation === 2 ? 'selected' : ''}>2</option>
+              </select>
+            </div>
+            <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">WH Fee</label><input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" data-prop="v2_warehouse_fee" value="${costData.v2_warehouse_fee ?? 0}" /></div>
           </div>
         </div>`;
+    } else {
+      html += `
+        <div class="field ${animClass}" style="${styleStr}">
+          <label class="field-label">${wh} <button class="btn-delete-wh" data-wh="${wh}" style="background:transparent; border:none; color:var(--err); cursor:pointer; float:right; font-size:16px; line-height:1;" title="Delete Warehouse">&times;</button></label>
+          <input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" value="${costData}" style="margin-top:4px;" />
+        </div>`;
     }
+  }
     
-    html += `</div><div class="divider"></div>
-    <div class="card-title" style="margin-bottom:14px;">Depo Maliyetleri</div>
-    <div class="row-2" style="margin-bottom: 14px;">`;
-    
-    for (const [wh, costData] of Object.entries(data.warehouses || {})) {
-      if (isV2) {
-        html += `
-          <div class="field" style="grid-column: span 2; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); position:relative;">
-            <button class="btn-delete-wh" data-wh="${wh}" style="position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:16px; line-height:1;" title="Delete Warehouse">&times;</button>
-            <label class="field-label" style="color: var(--text); font-weight: 600;">${wh} WAREHOUSE</label>
-            <div class="input-row" style="margin-top: 8px; align-items: flex-end;">
-              <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">Add. Cost</label><input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" data-prop="v2_additional_cost" value="${costData.v2_additional_cost}" /></div>
-              <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">Equation</label>
-                <select class="select cu-wh-input" data-wh="${wh}" data-prop="v2_equation" style="width: 100%; padding: 9px 11px;">
-                  <option value="1" ${costData.v2_equation === 1 ? 'selected' : ''}>1</option>
-                  <option value="2" ${costData.v2_equation === 2 ? 'selected' : ''}>2</option>
-                </select>
-              </div>
-              <div style="flex: 1;"><label class="field-label" style="font-size: 10px;">WH Fee</label><input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" data-prop="v2_warehouse_fee" value="${costData.v2_warehouse_fee}" /></div>
-            </div>
-          </div>`;
-      } else {
-        html += `
-          <div class="field" style="position:relative; background: var(--panel-raised); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: auto;">
-            <label class="field-label">${wh} <button class="btn-delete-wh" data-wh="${wh}" style="background:transparent; border:none; color:var(--err); cursor:pointer; float:right; font-size:16px; line-height:1;" title="Delete Warehouse">&times;</button></label>
-            <input type="number" step="0.01" class="cu-wh-input text-input" data-wh="${wh}" value="${costData}" style="margin-top:4px;" />
-          </div>`;
-      }
-    }
-    
-    html += `</div>
+  // Butonları listenin altına da ekliyoruz
+  html += `</div>
     <div class="divider"></div>
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="display:flex; gap:8px;">
-        <input type="text" class="text-input new-wh-input" placeholder="New Warehouse (e.g., TX)" style="width:160px; font-size:12.8px; padding:6px 11px;" />
-        <button class="btn btn-primary btn-add-warehouse" style="padding:6px 14px;">Add</button>
-      </div>
+    <div style="display:flex; justify-content:flex-end; align-items:center;">
       <div style="display:flex;">
-        <button class="btn btn-revert-cu-settings" style="padding:6px 14px; margin-right:8px;" title="Delete unsaved changes">Revert</button>
-        <button class="btn btn-save-cu-settings" style="padding:6px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
+        <button class="btn btn-sm btn-revert-cu-settings" style="padding:10px 14px; margin-right:8px;" title="Unsaved changes will be lost">Revert</button>
+        <button class="btn btn-sm btn-save-cu-settings" style="padding:10px 14px; border-color:var(--accent); color:var(--accent);">Save Settings</button>
       </div>
     </div>`;
-    
-    container.innerHTML = html;
 
-    // -- Event Listeners (Bi-directional Data Binding) --
-    
-    // Senkronizasyon
-    document.querySelectorAll(".cu-wh-input").forEach(input => {
-      input.addEventListener("change", (e) => {
-        const wh = e.target.dataset.wh;
-        const prop = e.target.dataset.prop;
+  container.innerHTML = html;
+
+  if (newlyAdded) {
+    setTimeout(() => {
+      const popEl = container.querySelector(".anim-pop");
+      if (popEl) popEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  }
+
+  // -- Event Listeners --
+  container.querySelectorAll(".cu-wh-input").forEach(input => {
+    input.addEventListener("change", (e) => {
+      const wh = e.target.dataset.wh;
+      const prop = e.target.dataset.prop;
+      if (isV2) data.warehouses[wh][prop] = parseFloat(e.target.value) || 0;
+      else data.warehouses[wh] = parseFloat(e.target.value) || 0;
+    });
+  });
+
+  container.querySelectorAll(".tag-input").forEach(input => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = e.target.value.trim();
+        const col = e.target.dataset.col;
+        if (val && !data.columns[col].includes(val)) {
+          data.columns[col].push(val);
+          renderSingleCuUI(containerId, data, isV2, title);
+        }
+      }
+    });
+  });
+
+  container.querySelectorAll(".file-chip-remove").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const col = e.currentTarget.dataset.col;
+      const val = e.currentTarget.dataset.val;
+      data.columns[col] = data.columns[col].filter(v => v !== val);
+      renderSingleCuUI(containerId, data, isV2, title);
+    });
+  });
+
+  container.querySelectorAll(".btn-delete-wh").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const wh = e.currentTarget.dataset.wh;
+      if (e.currentTarget.dataset.confirm === "1") {
+        delete data.warehouses[wh];
+        renderSingleCuUI(containerId, data, isV2, title);
+      } else {
+        e.currentTarget.dataset.confirm = "1";
+        e.currentTarget.innerHTML = "Delete?";
+        e.currentTarget.style.fontSize = "11px";
+        e.currentTarget.style.backgroundColor = "var(--err)";
+        e.currentTarget.style.color = "#fff";
+        e.currentTarget.style.padding = "6px 8px";
+        e.currentTarget.style.borderRadius = "4px";
         if (isV2) {
-          currentCuSettings.warehouses[wh][prop] = parseFloat(e.target.value) || 0;
-        } else {
-          currentCuSettings.warehouses[wh] = parseFloat(e.target.value) || 0;
-        }
-      });
-    });
-
-    // Etiket Ekleme
-    document.querySelectorAll(".tag-input").forEach(input => {
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          const val = e.target.value.trim();
-          const col = e.target.dataset.col;
-          if (val && !currentCuSettings.columns[col].includes(val)) {
-            currentCuSettings.columns[col].push(val);
-            renderCostUpdaterUI(currentCuSettings, isV2);
-          }
-        }
-      });
-    });
-
-    // Etiket Silme
-    document.querySelectorAll(".file-chip-remove").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const col = e.currentTarget.dataset.col;
-        const val = e.currentTarget.dataset.val;
-        currentCuSettings.columns[col] = currentCuSettings.columns[col].filter(v => v !== val);
-        renderCostUpdaterUI(currentCuSettings, isV2);
-      });
-    });
-
-    // Çökmeyi Engelleyen Modern Depo Silme (Satır İçi Onay)
-    document.querySelectorAll(".btn-delete-wh").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const wh = e.currentTarget.dataset.wh;
-        if (e.currentTarget.dataset.confirm === "1") {
-          delete currentCuSettings.warehouses[wh];
-          renderCostUpdaterUI(currentCuSettings, isV2);
-        } else {
-          // İki aşamalı doğrulama: Buton 3 saniyeliğine "Sil?" uyarısına dönüşür
-          e.currentTarget.dataset.confirm = "1";
-          e.currentTarget.innerHTML = "Delete?";
-          e.currentTarget.style.fontSize = "11px";
-          e.currentTarget.style.backgroundColor = "var(--err)";
-          e.currentTarget.style.color = "#fff";
-          e.currentTarget.style.padding = "6px 8px";
-          e.currentTarget.style.borderRadius = "4px";
           e.currentTarget.style.top = "6px";
           e.currentTarget.style.right = "6px";
-          
-          setTimeout(() => {
-            if (document.body.contains(e.currentTarget)) { // DOM'dan silinmediyse sıfırla
-              e.currentTarget.dataset.confirm = "0";
-              e.currentTarget.innerHTML = "&times;";
-              e.currentTarget.style = "position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:16px; line-height:1;";
-            }
-          }, 3000);
         }
-      });
-    });
-  
-
-    // Blokajsız Yeni Depo Ekleme
-    const addWhBtn = container.querySelector(".btn-add-warehouse");
-    const addWhInput = container.querySelector(".new-wh-input");
-    
-    if (addWhBtn && addWhInput) {
-      addWhBtn.addEventListener("click", () => {
-        const newWh = addWhInput.value.trim().toUpperCase();
-        if (newWh) {
-          if (!currentCuSettings.warehouses[newWh]) {
+        setTimeout(() => {
+          if (document.body.contains(e.currentTarget)) { 
+            e.currentTarget.dataset.confirm = "0";
+            e.currentTarget.innerHTML = "&times;";
             if (isV2) {
-              currentCuSettings.warehouses[newWh] = { v2_additional_cost: 0, v2_equation: 1, v2_warehouse_fee: 0 };
+              e.currentTarget.style = "position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:16px; line-height:1;";
             } else {
-              currentCuSettings.warehouses[newWh] = 0;
+              e.currentTarget.style = "background:transparent; border:none; color:var(--err); cursor:pointer; float:right; font-size:16px; line-height:1;";
             }
-            renderCostUpdaterUI(currentCuSettings, isV2);
-          } else {
-            toast("This warehouse code is already in the system.");
           }
-        }
-      });
-      
-      // Enter'a basılınca butonu tetikler
-      addWhInput.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") addWhBtn.click();
-      });
-    }
+        }, 3000);
+      }
+    });
+  });
 
-    // Bağımsız Diske Yazma İşlemi (Save)
-    const saveSettingsBtn = container.querySelector(".btn-save-cu-settings");
-    if (saveSettingsBtn) {
-      saveSettingsBtn.addEventListener("click", async () => {
-        saveSettingsBtn.disabled = true;
-        const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
-        await api().save_settings(fileName, JSON.stringify(currentCuSettings));
-        toast("Settings saved to disk successfully.");
-        saveSettingsBtn.disabled = false;
-      });
-    }
-    const revertSettingsBtn = document.getElementById("btn-revert-cu-settings");
-    if (revertSettingsBtn) {
-      revertSettingsBtn.addEventListener("click", () => {
-        loadCostUpdaterSettings();
-        toast("Changes reverted.");
-      });
-    }
+  const addWhBtn = container.querySelector(".btn-add-warehouse");
+  const addWhInput = container.querySelector(".new-wh-input");
+  
+  if (addWhBtn && addWhInput) {
+    addWhBtn.addEventListener("click", () => {
+      const newWh = addWhInput.value.trim().toUpperCase();
+      if (newWh) {
+        if (!data.warehouses[newWh]) {
+          const defaultVal = isV2 ? { v2_additional_cost: 0, v2_equation: 1, v2_warehouse_fee: 0 } : 0;
+          // YENİ ELEMANI EN BAŞA (TOP) YERLEŞTİR
+          data.warehouses = { [newWh]: defaultVal, ...data.warehouses };
+          renderSingleCuUI(containerId, data, isV2, title, newWh);
+        } else {
+          toast("This warehouse code is already in the system.");
+        }
+      }
+    });
+    
+    addWhInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") addWhBtn.click();
+    });
+  }
+
+  // querySelectorAll kullanarak hem üst hem alt butonları dinle
+  container.querySelectorAll(".btn-save-cu-settings").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const btns = container.querySelectorAll(".btn-save-cu-settings");
+      btns.forEach(b => b.disabled = true);
+      const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
+      await api().save_settings(fileName, JSON.stringify(data));
+      toast("Settings saved to disk successfully.");
+      btns.forEach(b => b.disabled = false);
+    });
+  });
+  
+  container.querySelectorAll(".btn-revert-cu-settings").forEach(btn => {
+    btn.addEventListener("click", () => {
+      loadCostUpdaterSettings();
+      toast("Changes reverted.");
+    });
   });
 }
 
@@ -1549,11 +1614,11 @@ document.getElementById("rs-restock-toggle").addEventListener("change", (e) => {
 updateRestockCardVisibility();
 
 // Restock Modülü JSON Editor Bağlantısı
-const restockEditor = new JSONConfigEditor("rs-settings-container", "restock_settings.json", [
+const restockEditor = new JSONConfigEditor("rs-settings-container", "restock_settings.json", null, [
   { key: "columns", title: "Column Mappings", type: "tags" },
   { key: "deposits", title: "Warehouse Costs", type: "key-value" }
 ]);
-const mainRestockEditor = new JSONConfigEditor("rs-settings-main-container", "restock_settings.json", [
+const mainRestockEditor = new JSONConfigEditor("rs-settings-main-container", "restock_settings.json", "Restock Settings", [
   { key: "columns", title: "Column Mappings", type: "tags" },
   { key: "deposits", title: "Warehouse Costs", type: "key-value" }
 ]);
@@ -1591,11 +1656,11 @@ document.getElementById("fp-run-btn").addEventListener("click", async () => {
 const ocRestockZone = new FileDropZone({ zoneId: "oc-restock-dropzone", listId: "oc-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const ocOrderformZone = new FileDropZone({ zoneId: "oc-orderform-dropzone", listId: "oc-orderform-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 document.getElementById("oc-template-btn").addEventListener("click", () => api().open_template_folder());
-const orderEditor = new JSONConfigEditor("oc-settings-container", "ordercreate_settings.json", [
+const orderEditor = new JSONConfigEditor("oc-settings-container", "ordercreate_settings.json", null, [
   { key: "restock_columns", title: "Restock File Columns", type: "tags" },
   { key: "orderform_columns", title: "Order Form File Columns", type: "tags" }
 ]);
-const mainOrderEditor = new JSONConfigEditor("oc-settings-main-container", "ordercreate_settings.json", [
+const mainOrderEditor = new JSONConfigEditor("oc-settings-main-container", "ordercreate_settings.json", "Order Creator Settings", [
   { key: "restock_columns", title: "Restock File Columns", type: "tags" },
   { key: "orderform_columns", title: "Order Form File Columns", type: "tags" }
 ]);
@@ -1611,10 +1676,10 @@ document.getElementById("oc-run-btn").addEventListener("click", async () => {
 
 // Invoice Processor
 const invZone = new FileDropZone({ zoneId: "inv-dropzone", listId: "inv-file-list", fileTypes: ["CSV Files (*.csv)", "All files (*.*)"] });
-const invoiceEditor = new JSONConfigEditor("inv-settings-container", "invoice_settings.json", [
+const invoiceEditor = new JSONConfigEditor("inv-settings-container", "invoice_settings.json", null, [
   { key: "columns", title: "Column Mappings", type: "tags" }
 ]);
-const mainInvoiceEditor = new JSONConfigEditor("inv-settings-main-container", "invoice_settings.json", [
+const mainInvoiceEditor = new JSONConfigEditor("inv-settings-main-container", "invoice_settings.json", "Invoice Processor Settings", [
   { key: "columns", title: "Column Mappings", type: "tags" }
 ]);
 document.getElementById("inv-run-btn").addEventListener("click", async () => {
@@ -1629,12 +1694,12 @@ document.getElementById("inv-run-btn").addEventListener("click", async () => {
 const scInvoiceZone = new FileDropZone({ zoneId: "sc-invoice-dropzone", listId: "sc-invoice-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const scOrderformZone = new FileDropZone({ zoneId: "sc-orderform-dropzone", listId: "sc-orderform-file-list", multiple: false, fileTypes: EXCEL_TYPES });
 const scRestockZone = new FileDropZone({ zoneId: "sc-restock-dropzone", listId: "sc-restock-file-list", multiple: false, fileTypes: EXCEL_TYPES });
-const shipmentEditor = new JSONConfigEditor("sc-settings-container", "shipment_settings.json", [
+const shipmentEditor = new JSONConfigEditor("sc-settings-container", "shipment_settings.json", null, [
   { key: "restock_columns", title: "Restock File Columns", type: "tags" },
   { key: "orderform_columns", title: "Order Form File Columns", type: "tags" },
   { key: "invoice_columns", title: "Invoice File Columns", type: "tags" }
 ]);
-const mainShipmentEditor = new JSONConfigEditor("sc-settings-main-container", "shipment_settings.json", [
+const mainShipmentEditor = new JSONConfigEditor("sc-settings-main-container", "shipment_settings.json", "Shipment Creator Settings", [
   { key: "restock_columns", title: "Restock File Columns", type: "tags" },
   { key: "orderform_columns", title: "Order Form File Columns", type: "tags" },
   { key: "invoice_columns", title: "Invoice File Columns", type: "tags" }

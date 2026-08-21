@@ -66,15 +66,9 @@ def process_invoice(
 
     # Tüm regex ve datetime dönüşümleri saf Pandas vektörizasyonu ile yapıldı
     clean_dates = df_merged[date_col].astype(str).str.replace(r'[,-]', '/', regex=True)
-    df_merged[date_col] = pd.to_datetime(clean_dates, format='mixed', errors='coerce').dt.strftime('%m/%d/%Y').fillna("#HATA")
+    df_merged[date_col] = pd.to_datetime(clean_dates, format='mixed', errors='coerce').dt.strftime('%d.%m.%Y').fillna("#HATA")
 
-    # MANTIK HATASI GİDERİLDİ: Tüm veriyi string'e çevirip Excel'in matematiksel yapısını 
-    # bozan küresel lambda döngüsü tamamen silindi. 
-    # Veriler disk üzerine orijinal sayısal (float/int) yapılarıyla aktarılacak,
-    # Excel bölgesel ayarlara göre noktayı zaten virgül olarak render edecektir.
-
-    os.makedirs(os.path.join(output_folder, "invoice_sonuc_excel"), exist_ok=True)
-    output_path = os.path.join(output_folder, "invoice_sonuc_excel", "toplu.xlsx")
+    output_path = os.path.join(output_folder, "toplu.xlsx")
 
     if progress_callback:
         progress_callback("Sonuç Excel dosyasına kaydediliyor...")
@@ -83,5 +77,5 @@ def process_invoice(
     return {
         "status": "success",
         "message": "İşlem vektörel hızda başarıyla tamamlandı!",
-        "output_path": output_path,
+        "output_path": output_folder,
     }

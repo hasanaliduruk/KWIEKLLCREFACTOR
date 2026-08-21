@@ -86,4 +86,4 @@ def process_tsvs_and_aggregate(files: List[str], target_path: str, settings_path
     })
     
     df.to_excel(out_path, index=False)
-    return out_path
+    return target_path
