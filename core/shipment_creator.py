@@ -48,6 +48,10 @@ def process_shipment_creation(
     if progress_callback: progress_callback("Invoice dosyası işleniyor...")
     df_inv_raw = pd.read_excel(invoice_files[0])
     df_inv = pd.DataFrame()
+    
+    # GİZLİ İNDEKS: Orijinal Invoice satır sırasını takip etmek için
+    df_inv["_orig_idx"] = np.arange(len(df_inv_raw))
+    
     df_inv["UPC"] = clean_upc(df_inv_raw[get_col(df_inv_raw, sutunlar_dict["invoice_upc"], "Invoice UPC")])
     df_inv["ShipQuantity"] = df_inv_raw[get_col(df_inv_raw, sutunlar_dict["invoice_shipquantity"], "Invoice ShipQuantity")]
     df_inv["Price"] = df_inv_raw[get_col(df_inv_raw, sutunlar_dict["invoice_price"], "Invoice Price")]
@@ -117,11 +121,23 @@ def process_shipment_creation(
     df_unmatched = df_inv[~df_inv["UPC"].isin(raw_res_upcs) & ~df_inv["UPC"].isin(raw_ord_upcs)].copy()
     df_unmatched["DOSYA"] = "#YOK"
     
+    # HİYERARŞİK SIRALAMA ÖNCELİKLERİ
+    matched_res["_sort_prio"] = 1
+    matched_ord["_sort_prio"] = 2
+    df_empty_res["_sort_prio"] = 3
+    df_empty_ord["_sort_prio"] = 4
+    df_unmatched["_sort_prio"] = 5
+    
     final_df = pd.concat([matched_res, matched_ord, df_empty_res, df_empty_ord, df_unmatched], ignore_index=True)
     
     for c in ["Price Check", "Suplier", "Asin", "Pcs", "PK", "SKU"]:
         if c not in final_df.columns: 
             final_df[c] = "#YOK"
+
+    # ORİJİNAL İNVOİCE SIRALAMASINI GERİ YÜKLE
+    # Aynı satırdan çoğalanları (birden fazla Asin eşleşmesi vs.) aralarında _sort_prio'ya göre diz
+    final_df.sort_values(by=["_orig_idx", "_sort_prio"], inplace=True)
+    final_df.reset_index(drop=True, inplace=True)
 
     # SKU2 HESAPLAMASI (Vektörel)
     valid_mask = (final_df["PK"] != "#YOK") & (final_df["Price"] != "#YOK")
@@ -178,7 +194,7 @@ def process_shipment_creation(
     final_df["PK EACH"] = np.where(final_df["Has_PK"], final_df["Yeni Pcs"] // final_df["Num_PK"].replace(0, np.nan), 0)
     final_df["Kalan"] = np.where(final_df["Has_PK"], final_df["Yeni Pcs"] % final_df["Num_PK"].replace(0, np.nan), 0)
     
-    # Sütun Sıralaması
+    # Sütun Sıralaması (Gizli indeksler `_orig_idx` ve `_sort_prio` Excel'e basılmaz, otomatik temizlenir)
     final_columns = [
         "UPC", "Price", "Price Check", "Suplier", "ShipQuantity", "Asin", "Pcs", 
         "Yeni Pcs", "PK", "SKU", "PackSize", "Brand", "Description", "DOSYA", 
