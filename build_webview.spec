@@ -24,6 +24,7 @@ a = Analysis(
         ('assets', 'assets'),
     ],
     hiddenimports=[
+        'rust_core',
         'webview',
         'webview.dom',
         'keyring',

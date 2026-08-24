@@ -31,3 +31,5 @@ build_tkinter.spec
 .VSCodeCounter/
 .venv12/
 repomix.config.json
+rust_core/target/
+rust_core/Cargo.lock
