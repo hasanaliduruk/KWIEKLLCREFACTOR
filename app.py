@@ -14,6 +14,7 @@ import time
 import ctypes
 import platform
 import dataclasses
+import rust_core
 
 import requests  
 import webview  
@@ -635,18 +636,21 @@ class Api:
             return False
 
         self._reset_cancel_flag()
+        
         def progress(msg, percent=None):
             if self._cancel_event.is_set():
                 raise InterruptedError("İşlem iptal edildi.")
-            self._emit("job-log", {"message": msg, "percent": percent})
-
-        islem = {"export": 1 if do_export else 0, "restock": 1 if do_restock else 0}
+            if msg:
+                self._emit("job-log", {"message": msg, "percent": percent})
 
         def worker():
             try:
-                # settings_path yerine settings_dict gönderiliyor
-                result = process_restock_logic(output_folder, row_files, export_files, restock_files, islem, save_name, settings_dict, progress)
-                self._emit("job-done", {"ok": True, "message": result.get("message", "Tamamlandı!"), "output_path": result["output_path"]})
+                settings_str = json.dumps(settings_dict)
+                output_path = rust_core.process_restock(
+                    progress, row_files, export_files, restock_files,
+                    bool(do_export), bool(do_restock), save_name, output_folder, settings_str
+                )
+                self._emit("job-done", {"ok": True, "message": "İşlem tamamlandı!", "output_path": output_path})
             except InterruptedError:
                 self._emit("job-done", {"ok": False, "message": "İşlem kullanıcı tarafından durduruldu."})
             except Exception as e:

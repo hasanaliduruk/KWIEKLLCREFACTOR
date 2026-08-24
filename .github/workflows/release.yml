@@ -26,9 +26,11 @@ jobs:
         python-version: '3.13'
         cache: 'pip'
 
+    - name: Install Stable Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+
     - name: Install System Dependencies (Linux)
       if: runner.os == 'Linux'
-      # Linux üzerinde pywebview ve grafik kütüphanelerinin derlenebilmesi için zorunludur
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev libgirepository1.0-dev libcairo2-dev gir1.2-gtk-3.0
@@ -37,14 +39,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install maturin
+
+    - name: Compile and Install Rust Core
+      run: maturin develop --release --manifest-path rust_core/Cargo.toml
 
     - name: Install macOS specific Webview dependencies
       if: runner.os == 'macOS'
-      # macOS üzerinde pywebview'in çalışması için PyObjC Cocoa köprüleri şarttır
       run: pip install pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit
 
     - name: Build with PyInstaller (All Platforms)
-      # Eski yaml dosyasındaki "main.py" yerine doğrudan .spec dosyanı tetikliyoruz
       run: pyinstaller build_webview.spec --clean
     
     - name: Copy Settings Folder to Dist (Linux & macOS)
@@ -57,7 +61,6 @@ jobs:
 
     - name: Compile Inno Setup Installer (Windows)
       if: runner.os == 'Windows'
-      # GitHub Actions Windows sunucularında Inno Setup (iscc) yüklü gelir
       run: iscc installer.iss
 
     - name: Archive Build (Linux)
@@ -72,12 +75,26 @@ jobs:
         cd dist
         hdiutil create -volname "OperationsToolkit" -srcfolder "OperationsToolkit_Webview.app" -ov -format UDZO OperationsToolkit-macOS.dmg
 
-    - name: Publish to GitHub Releases
+    - name: Publish Windows Release
+      if: runner.os == 'Windows'
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          Output/OperationsToolkit_Setup.exe
-          dist/OperationsToolkit-${{ runner.os }}.tar.gz
-          dist/OperationsToolkit-macOS.dmg
+        files: Output/OperationsToolkit_Setup.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish Linux Release
+      if: runner.os == 'Linux'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/OperationsToolkit-Linux.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish macOS Release
+      if: runner.os == 'macOS'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/OperationsToolkit-macOS.dmg
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
