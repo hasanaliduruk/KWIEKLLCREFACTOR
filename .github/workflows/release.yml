@@ -42,7 +42,10 @@ jobs:
         pip install maturin
 
     - name: Compile and Install Rust Core
-      run: maturin develop --release --manifest-path rust_core/Cargo.toml
+      shell: bash
+      run: |
+        maturin build --release --manifest-path rust_core/Cargo.toml --out rust-wheels
+        pip install rust-wheels/*.whl
 
     - name: Install macOS specific Webview dependencies
       if: runner.os == 'macOS'
