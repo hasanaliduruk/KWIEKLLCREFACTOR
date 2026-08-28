@@ -1247,7 +1247,7 @@ def main():
     window.events.closing += on_closing
     window.events.loaded += on_loaded
 
-    webview.start(debug=True, icon=icon_path)
+    webview.start(debug=False, icon=icon_path)
 
 if __name__ == "__main__":
     main()
