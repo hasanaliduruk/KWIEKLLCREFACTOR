@@ -15,6 +15,7 @@ import ctypes
 import platform
 import dataclasses
 import rust_core
+import datetime
 
 import requests  
 import webview  
@@ -34,7 +35,7 @@ from core.expiration_processor import process_expiration
 from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
 from core.pk_extractor import PKExtractorEngine
 
-CURRENT_VERSION = "v1.3.10"
+CURRENT_VERSION = "v1.3.11"
 GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -470,6 +471,7 @@ class Api:
 
     def inv_import_stock(self, file_path):
         try:
+            import pandas as pd
             db = self._get_inventory_db()
             if file_path.endswith('.csv'):
                 try: df = pd.read_csv(file_path, encoding='utf-8')
@@ -478,20 +480,31 @@ class Api:
                 df = pd.read_excel(file_path)
 
             sku_col = 'Merchant SKU' if 'Merchant SKU' in df.columns else ('SKU' if 'SKU' in df.columns else df.columns[0])
-            sum_cols = ['Available', 'FC transfer', 'FC Processing', 'Unfulfillable', 'Shipped', 'Receiving']
+            sum_cols = ['Available', 'FC transfer', 'FC Processing', 'Receiving']
             has_formula = all(c in df.columns for c in sum_cols)
-            
+
+            unfill_col = next((c for c in df.columns if 'unfulfillable' in str(c).lower()), None)
+
             stock_dict = {}
             for _, r in df.iterrows():
                 s = str(r[sku_col]).strip()
                 if not s or s.lower() == 'nan': continue
+
                 if has_formula:
-                    q = sum(int(pd.to_numeric(r[c], errors='coerce')) if pd.notnull(pd.to_numeric(r[c], errors='coerce')) else 0 for c in sum_cols)
+                    q = sum(int(pd.to_numeric(r[c], errors='coerce')) if pd.notnull(
+                        pd.to_numeric(r[c], errors='coerce')) else 0 for c in sum_cols)
                 else:
-                    qty_col = 'Total Units' if 'Total Units' in df.columns else ('QTY' if 'QTY' in df.columns else df.columns[1])
+                    qty_col = 'Total Units' if 'Total Units' in df.columns else (
+                        'QTY' if 'QTY' in df.columns else df.columns[1])
                     val = pd.to_numeric(r[qty_col], errors='coerce')
                     q = int(val) if pd.notnull(val) else 0
-                stock_dict[s] = q
+
+                u_qty = 0
+                if unfill_col:
+                    u_val = pd.to_numeric(r[unfill_col], errors='coerce')
+                    u_qty = int(u_val) if pd.notnull(u_val) else 0
+
+                stock_dict[s] = {'total': q, 'unfulfillable': u_qty}
 
             db.update_amazon_stock(stock_dict)
             return {"ok": True, "message": f"Stok güncellendi ({len(stock_dict)} SKU)."}
@@ -563,7 +576,7 @@ class Api:
 
     def inv_export_excel(self, output_folder):
         try:
-            today_str = datetime.now().strftime("%Y.%m.%d")
+            today_str = datetime.datetime.now().strftime("%Y.%m.%d")
             file_path = os.path.join(output_folder, f"Expration Date Analizi_{today_str}.xlsx")
             ExcelReportExporter.export_master_excel(file_path, self._get_inventory_db())
             return {"ok": True, "path": file_path}
@@ -1234,7 +1247,7 @@ def main():
     window.events.closing += on_closing
     window.events.loaded += on_loaded
 
-    webview.start(debug=False, icon=icon_path)
+    webview.start(debug=True, icon=icon_path)
 
 if __name__ == "__main__":
     main()

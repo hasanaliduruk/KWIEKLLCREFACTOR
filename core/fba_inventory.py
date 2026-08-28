@@ -46,6 +46,7 @@ class FIFOResultRow:
     days_remaining: int
     amz_stock_days: int
     amz_stock_allocated: int
+    unfulfillable: int = 0
     note: str = ""
 
 
@@ -61,105 +62,51 @@ class UniversalDateParser:
     }
 
     @classmethod
+    def _strip_time(cls, val: Any) -> str:
+        # '10-10-2026 10:57:34' gibi verilerden saat kısmını söküp atar
+        val_str = str(val).strip()
+        return re.sub(r'\s+\d{1,2}:\d{2}(:\d{2})?.*', '', val_str)
+
+    @classmethod
     def parse_created_date(cls, date_val: Any) -> Tuple[str, datetime]:
         if pd.isna(date_val) or date_val is None:
             dt = datetime.now()
-            return dt.strftime("%d.%m.%Y"), dt
+            return dt.strftime("%d %b %Y").lstrip("0"), dt
 
-        if isinstance(date_val, (datetime, pd.Timestamp)):
-            dt = date_val.to_pydatetime() if hasattr(date_val, 'to_pydatetime') else date_val
-            return dt.strftime("%d.%m.%Y"), dt
-
-        val_str = str(date_val).strip().rstrip(',')
-        if not val_str or val_str.lower() in ['nan', 'none', 'null', '0']:
-            dt = datetime.now()
-            return dt.strftime("%d.%m.%Y"), dt
-
-        match = re.search(r'CREATED\s*>\s*(\d{1,2})\s*([A-Za-z]{3})\s*(\d{4})', val_str)
-        if match:
-            day, month_str, year = match.groups()
-            month = cls.MONTH_MAP.get(month_str[:3].capitalize(), "01")
-            formatted = f"{int(day):02d}.{month}.{year}"
-            try:
-                dt = datetime.strptime(formatted, "%d.%m.%Y")
-                return formatted, dt
-            except Exception:
-                pass
-
-        match_text = re.search(r'(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})', val_str)
-        if match_text:
-            day, month_str, year = match_text.groups()
-            month = cls.MONTH_MAP.get(month_str[:3].capitalize(), "01")
-            formatted = f"{int(day):02d}.{month}.{year}"
-            try:
-                dt = datetime.strptime(formatted, "%d.%m.%Y")
-                return formatted, dt
-            except Exception:
-                pass
+        val_str = cls._strip_time(date_val)
 
         try:
             parsed_dt = pd.to_datetime(val_str, errors='coerce', dayfirst=True)
             if pd.notnull(parsed_dt):
                 dt = parsed_dt.to_pydatetime()
-                return dt.strftime("%d.%m.%Y"), dt
+                return dt.strftime("%d %b %Y").lstrip("0"), dt
         except Exception:
             pass
 
         dt = datetime.now()
-        return dt.strftime("%d.%m.%Y"), dt
+        return dt.strftime("%d %b %Y").lstrip("0"), dt
 
     @classmethod
     def parse_exp_date(cls, date_val: Any) -> Tuple[str, str, int]:
         if pd.isna(date_val) or date_val is None:
             return "", "", 0
 
+        val_str = cls._strip_time(date_val)
         dt = None
-        if isinstance(date_val, (datetime, pd.Timestamp)):
-            dt_raw = date_val.to_pydatetime() if hasattr(date_val, 'to_pydatetime') else date_val
-            try:
-                dt = datetime(dt_raw.year, dt_raw.day, dt_raw.month)
-            except ValueError:
-                dt = dt_raw
+        try:
+            parsed_dt = pd.to_datetime(val_str, errors='coerce')
+            if pd.notnull(parsed_dt):
+                dt = parsed_dt.to_pydatetime()
+        except Exception:
+            pass
 
         if dt is None:
-            val_str = str(date_val).strip()
-            if not val_str or val_str.lower() in ['nan', 'none', 'null', '0']:
-                return "", "", 0
-
-            m_date = re.match(r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$', val_str)
-            if m_date:
-                p1, p2, p3 = int(m_date.group(1)), int(m_date.group(2)), int(m_date.group(3))
-                if p1 > 12:
-                    try:
-                        dt = datetime(p3, p2, p1)
-                    except Exception:
-                        pass
-                else:
-                    try:
-                        dt = datetime(p3, p1, p2)
-                    except Exception:
-                        try:
-                            dt = datetime(p3, p2, p1)
-                        except Exception:
-                            pass
-
-            if dt is None:
-                try:
-                    parsed_dt = pd.to_datetime(val_str, errors='coerce')
-                    if pd.notnull(parsed_dt):
-                        dt = parsed_dt.to_pydatetime()
-                except Exception:
-                    pass
-
-        if dt is None or pd.isna(dt):
-            val_clean = str(date_val).strip().replace('.', '-')
-            return val_clean, val_clean, 0
+            return val_str, val_str, 0
 
         exp_usa = dt.strftime("%m-%d-%Y")
         exp_tur = dt.strftime("%d.%m.%Y")
         days_left = (dt.date() - datetime.now().date()).days
         return exp_usa, exp_tur, days_left
-
 
 class ShipmentIDExtractor:
     """Extraction Engine for extracting FBA Shipment IDs from raw text or complex Worksheets."""
@@ -345,6 +292,10 @@ class DatabaseManager:
 
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_shipment_sku ON shipment_items(sku)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_created_timestamp ON shipment_items(created_timestamp)")
+            try:
+                cursor.execute("ALTER TABLE amazon_stock ADD COLUMN unfulfillable INTEGER DEFAULT 0")
+            except Exception:
+                pass
             conn.commit()
 
     def update_item_note(self, shipment_id: str, sku: str, exp_date_usa: str, note: str):
@@ -389,11 +340,17 @@ class DatabaseManager:
             return {row[0].strip() for row in cursor.fetchall() if row[0]}
 
     def import_babil_master_excel(self, file_path: str) -> Tuple[bool, str]:
+        import time  # Süre ölçümü için time modülü
+        
+        genel_baslangic = time.time()
+        
+        # --- AŞAMA 1: MEVCUT KAYITLARI KONTROL ETME ---
         candidate_ids = ShipmentIDExtractor.extract_shipment_ids_from_file(file_path)
         for s_id in candidate_ids:
             if self.is_shipment_exists(s_id):
                 return False, f"Shipment ID {s_id} sistemde kayıtlıdır."
 
+        # --- AŞAMA 2: EXCEL OKUMA (TARGET SHEET) ---
         xls = pd.ExcelFile(file_path)
         sheet_names = xls.sheet_names
         
@@ -425,6 +382,7 @@ class DatabaseManager:
         if not col_exp_usa:
             col_exp_usa = next((c for c in cols if 'exp' in str(c).lower()), cols[5] if len(cols) > 5 else cols[0])
 
+        # --- AŞAMA 3: ANALİZ SAYFASINDAN NOTLARI ÇEKME ---
         notes_dict = {}
         for s in sheet_names:
             if 'ANALİZ' in s.upper() or 'ANALIZ' in s.upper():
@@ -442,52 +400,138 @@ class DatabaseManager:
                         if a_id and a_sku and a_note:
                             notes_dict[(a_id, a_sku)] = a_note
 
-        rows_imported = 0
+
+        # --- AŞAMA 4: VEKTÖRİZASYON VE METİN TEMİZLİĞİ ---
+        now = datetime.now()
+
+        df[col_sku] = df[col_sku].astype(str).str.strip().str.replace('\t', '', regex=False).str.replace('\n', '', regex=False)
+        df[col_id] = df[col_id].astype(str).str.strip().str.replace('\t', '', regex=False).str.replace('\n', '', regex=False)
+        df[col_name] = df[col_name].astype(str).str.strip().str.replace('\t', '', regex=False).str.replace('\n', '', regex=False)
+        df = df[(df[col_sku] != '') & (df[col_id] != '') & (df[col_sku].str.lower() != 'nan')].copy()
+        
+        df['__qty'] = pd.to_numeric(
+            df[col_qty].astype(str).str.replace(',', '.').str.extract(r'(\d+\.?\d*)', expand=False),
+            errors='coerce').fillna(0).astype(int)
+
+        if col_date in df.columns:
+            date_clean = df[col_date].astype(str).str.replace(r'\s+\d{1,2}:\d{2}(:\d{2})?.*', '', regex=True)
+        else:
+            date_clean = pd.Series([''], index=df.index)
+
+        created_series = pd.to_datetime(date_clean, errors='coerce', dayfirst=True).fillna(pd.Timestamp(now))
+        df['__created_dt'] = created_series
+        df['__created_fmt'] = created_series.dt.strftime('%d %b %Y').str.lstrip('0')
+
+        if col_exp_usa in df.columns:
+            exp_clean = df[col_exp_usa].astype(str).str.replace(r'\s+\d{1,2}:\d{2}(:\d{2})?.*', '', regex=True)
+        else:
+            exp_clean = pd.Series([''], index=df.index)
+
+        exp_series = pd.to_datetime(exp_clean, errors='coerce')
+
+        df['__exp_usa'] = exp_series.dt.strftime('%m-%d-%Y').fillna("")
+        df['__exp_tur'] = exp_series.dt.strftime('%d.%m.%Y').fillna("")
+
+        df['__days_remaining'] = (exp_series.dt.normalize() - pd.Timestamp(now).normalize()).dt.days.fillna(0).astype(int)
+
+        records = df[[col_id, col_name, col_sku, '__qty', '__created_dt', '__created_fmt', '__exp_usa', '__exp_tur', '__days_remaining']].to_dict('records')
+
+
+        # --- AŞAMA 5: SQL INSERT DİZİSİNİ OLUŞTURMA ---
+        insert_data = []
+        for row in records:
+            s_id = str(row[col_id])
+            s_name = str(row[col_name])
+            sku = str(row[col_sku])
+
+            matched_note = notes_dict.get((s_id.upper(), sku.upper()), "")
+
+            insert_data.append((
+                s_id, s_name, row['__created_fmt'], row['__created_dt'].to_pydatetime(), sku, row['__qty'],
+                row['__exp_usa'], row['__exp_tur'], row['__days_remaining'], matched_note, s_name, s_id, sku
+            ))
+
+        rows_imported = len(insert_data)
+
+
+        # --- AŞAMA 5: SQL INSERT DİZİSİNİ OLUŞTURMA ---
+        
+        # SQL Subquery yerine mevcut notları RAM'e çekiyoruz (O(1) erişim)
+        existing_notes = {}
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            for _, row in df.iterrows():
-                shipment_name = str(row[col_name]).strip().replace('\t', '').replace('\n', '') if pd.notnull(row.get(col_name)) else ""
-                shipment_id = str(row[col_id]).strip().replace('\t', '').replace('\n', '') if pd.notnull(row.get(col_id)) else ""
-                date_val = row.get(col_date)
-                sku = str(row[col_sku]).strip().replace('\t', '').replace('\n', '') if pd.notnull(row.get(col_sku)) else ""
-                
-                raw_qty = row.get(col_qty)
-                try:
-                    qty = int(float(str(raw_qty).strip().replace(',', '.'))) if pd.notnull(raw_qty) else 0
-                except Exception:
-                    qty = 0
+            cursor.execute("SELECT shipment_id, sku, note FROM shipment_items WHERE note != '' AND note IS NOT NULL")
+            for r_id, r_sku, r_note in cursor.fetchall():
+                if r_id and r_sku:
+                    existing_notes[(str(r_id).upper(), str(r_sku).upper())] = r_note
 
-                exp_raw = row.get(col_exp_usa)
+        insert_data = []
+        for row in records:
+            s_id = str(row[col_id])
+            s_name = str(row[col_name])
+            sku = str(row[col_sku])
 
-                if not sku or not shipment_id or sku.lower() == 'nan':
-                    continue
-
-                created_fmt, created_dt = UniversalDateParser.parse_created_date(date_val)
-                exp_usa, exp_tur, days_left = UniversalDateParser.parse_exp_date(exp_raw)
-
-                matched_note = notes_dict.get((shipment_id.upper(), sku.upper()), "")
-
-                cursor.execute("""
-                    INSERT INTO shipment_items 
-                    (shipment_id, shipment_name, created_date, created_timestamp, sku, qty, exp_date_usa, exp_date_tur, days_remaining, note)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(NULLIF(?, ''), (SELECT note FROM shipment_items WHERE UPPER(shipment_name)=UPPER(?) AND UPPER(shipment_id)=UPPER(?) AND UPPER(sku)=UPPER(?)), ''))
-                """, (shipment_id, shipment_name, created_fmt, created_dt, sku, qty, exp_usa, exp_tur, days_left, matched_note, shipment_name, shipment_id, sku))
-                rows_imported += 1
+            # 1. Excel'den (Analiz sayfasından) gelen not var mı?
+            matched_note = notes_dict.get((s_id.upper(), sku.upper()), "")
             
+            # 2. Yoksa veritabanındaki eski notu koru
+            if not matched_note:
+                matched_note = existing_notes.get((s_id.upper(), sku.upper()), "")
+
+            # Tuple uzunluğu saf INSERT için 10 parametreye düşürüldü
+            insert_data.append((
+                s_id, s_name, row['__created_fmt'], row['__created_dt'].to_pydatetime(), sku, row['__qty'],
+                row['__exp_usa'], row['__exp_tur'], row['__days_remaining'], matched_note
+            ))
+
+        rows_imported = len(insert_data)
+
+
+        # --- AŞAMA 6 & 7: VERİTABANINA YAZMA (BULK INSERT) ---
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Saf, alt sorgusuz (subquery-free) yüksek hızlı INSERT
+            cursor.executemany("""
+                INSERT INTO shipment_items
+                (shipment_id, shipment_name, created_date, created_timestamp, sku, qty, exp_date_usa,
+                 exp_date_tur, days_remaining, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, insert_data)
+
             if 'Amazon' in sheet_names:
                 df_amz = pd.read_excel(xls, sheet_name='Amazon')
+                amz_insert_data = []
                 sku_col = next((c for c in df_amz.columns if 'sku' in str(c).lower()), df_amz.columns[0])
-                qty_col = next((c for c in df_amz.columns if any(k in str(c).lower() for k in ['qty', 'units', 'total'])), df_amz.columns[1])
+                qty_col = next(
+                    (c for c in df_amz.columns if any(k in str(c).lower() for k in ['qty', 'units', 'total'])),
+                    df_amz.columns[1])
+
+                unfill_col = next((c for c in df_amz.columns if 'unfulfillable' in str(c).lower()), None)
+
                 for _, r in df_amz.iterrows():
                     s = str(r[sku_col]).strip().replace('\t', '').replace('\n', '')
                     try:
                         q = int(float(str(r[qty_col]).strip().replace(',', '.'))) if pd.notnull(r[qty_col]) else 0
                     except Exception:
                         q = 0
+
+                    u_qty = 0
+                    if unfill_col:
+                        try:
+                            u_qty = int(float(str(r[unfill_col]).strip().replace(',', '.'))) if pd.notnull(r[unfill_col]) else 0
+                        except Exception:
+                            pass
+
                     if s and s.lower() != 'nan':
-                        cursor.execute("INSERT OR REPLACE INTO amazon_stock (sku, total_units) VALUES (?, ?)", (s, q))
+                        amz_insert_data.append((s, q, u_qty))
+
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO amazon_stock (sku, total_units, unfulfillable) VALUES (?, ?, ?)",
+                    amz_insert_data)
 
             conn.commit()
+
         return True, f"Master Excel verileri başarıyla yüklendi. ({rows_imported} satır eksiksiz aktarıldı, {len(notes_dict)} adet açıklama notu işlendi)"
 
     def add_picklist_shipment(self, header: ShipmentHeader, items: List[ItemInfoRow]):
@@ -514,14 +558,14 @@ class DatabaseManager:
                 ))
             conn.commit()
 
-    def update_amazon_stock(self, stock_dict: Dict[str, int]):
+    def update_amazon_stock(self, stock_dict: Dict[str, Dict[str, int]]):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM amazon_stock;")
-            for sku, qty in stock_dict.items():
+            for sku, data in stock_dict.items():
                 cursor.execute("""
-                    INSERT INTO amazon_stock (sku, total_units) VALUES (?, ?)
-                """, (sku, qty))
+                    INSERT INTO amazon_stock (sku, total_units, unfulfillable) VALUES (?, ?, ?)
+                """, (sku, data['total'], data['unfulfillable']))
             conn.commit()
 
     def get_all_shipments_sorted_by_date(self) -> List[Dict]:
@@ -531,11 +575,15 @@ class DatabaseManager:
             cursor.execute("SELECT * FROM shipment_items ORDER BY created_timestamp ASC, id ASC")
             return [dict(r) for r in cursor.fetchall()]
 
-    def get_amazon_stock_map(self) -> Dict[str, int]:
+    def get_amazon_stock_map(self) -> Dict[str, Dict[str, int]]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT sku, total_units FROM amazon_stock")
-            return {r[0]: r[1] for r in cursor.fetchall()}
+            try:
+                cursor.execute("SELECT sku, total_units, unfulfillable FROM amazon_stock")
+                return {r[0]: {'total': r[1], 'unfulfillable': r[2]} for r in cursor.fetchall()}
+            except:
+                cursor.execute("SELECT sku, total_units FROM amazon_stock")
+                return {r[0]: {'total': r[1], 'unfulfillable': 0} for r in cursor.fetchall()}
 
 
 # ==========================================
@@ -587,7 +635,8 @@ class FIFOEngine:
             lots = sku_groups[sku]
             lots.sort(key=lambda x: x['created_dt'])
 
-            total_amazon_stock = amazon_stock_map.get(sku, 0)
+            total_amazon_stock = amazon_stock_map.get(sku, {}).get('total', 0)
+            unfill_qty = amazon_stock_map.get(sku, {}).get('unfulfillable', 0)
 
             for i, lot in enumerate(lots):
                 qty_shipped = lot['qty_shipped']
@@ -615,6 +664,7 @@ class FIFOEngine:
                         days_remaining=lot['days_remaining'],
                         amz_stock_days=lot['amz_stock_days'],
                         amz_stock_allocated=allocated,
+                        unfulfillable=unfill_qty,
                         note=lot['note']
                     ))
 
@@ -684,7 +734,7 @@ class ExcelReportExporter:
                     c.alignment = Alignment(horizontal="center", vertical="center")
 
         ws_analiz = wb.create_sheet(title="ANALİZ")
-        headers_analiz = ["SHIPMENT NAME", "SHIPMENT ID", "SKU", "QTY", "AMZ STOK", "AMZ STOK GÜN", "SKT GÜN", "NOT"]
+        headers_analiz = ["SHIPMENT NAME", "SHIPMENT ID", "SKU", "UNFULFILLABLE", "QTY", "AMZ STOK", "AMZ STOK GÜN", "SKT GÜN", "NOT"]
         ws_analiz.append(headers_analiz)
 
         for col in range(1, len(headers_analiz) + 1):
@@ -695,22 +745,30 @@ class ExcelReportExporter:
 
         for item in analiz_list:
             row_vals = [
-                item.shipment_name, item.shipment_id, item.sku,
+                item.shipment_name, item.shipment_id, item.sku, item.unfulfillable,
                 item.qty_shipped, item.amz_stock_allocated,
                 item.amz_stock_days, item.days_remaining, item.note
             ]
             ws_analiz.append(row_vals)
             curr_row = ws_analiz.max_row
-            
+
             sku_cell = ws_analiz.cell(row=curr_row, column=3)
-            stock_cell = ws_analiz.cell(row=curr_row, column=5)
-            days_cell = ws_analiz.cell(row=curr_row, column=7)
+            unfill_cell = ws_analiz.cell(row=curr_row, column=4)
+            stock_cell = ws_analiz.cell(row=curr_row, column=6)
+            days_cell = ws_analiz.cell(row=curr_row, column=8)
 
             if analiz_sku_counts[item.sku] > 1:
                 sku_cell.fill = green_fill
                 sku_cell.font = green_font
             else:
                 sku_cell.font = regular_font
+
+            # Unfulfillable değeri 0'dan büyükse kırmızı (alert) işaretle
+            if item.unfulfillable > 0:
+                unfill_cell.fill = alert_fill
+                unfill_cell.font = alert_font
+            else:
+                unfill_cell.font = regular_font
 
             if item.days_remaining <= 180:
                 days_cell.fill = alert_fill
@@ -721,13 +779,16 @@ class ExcelReportExporter:
             stock_cell.fill = green_fill
             stock_cell.font = bold_font
 
-            for col in range(1, 9):
+            # 4. Stil döngüsü aralığını 10'a çıkar (9 sütun için 1-9)
+            for col in range(1, 10):
                 c = ws_analiz.cell(row=curr_row, column=col)
-                if col not in [3, 5, 7] or (col == 3 and analiz_sku_counts[item.sku] <= 1) or (col == 7 and item.days_remaining > 180):
+                if col not in [3, 4, 6, 8] or (col == 3 and analiz_sku_counts[item.sku] <= 1) or (
+                        col == 4 and item.unfulfillable <= 0) or (col == 8 and item.days_remaining > 180):
                     c.font = regular_font
                 c.border = border_thin
-                
-                if col in [1, 3, 8]:
+
+                # Hizalamalar: Sütun 9 "NOT" sütunudur.
+                if col in [1, 3, 9]:
                     c.alignment = Alignment(horizontal="left", vertical="center")
                 else:
                     c.alignment = Alignment(horizontal="center", vertical="center")
@@ -739,8 +800,8 @@ class ExcelReportExporter:
             c.fill = header_fill
             c.font = header_font
 
-        for sku, total in stock_map.items():
-            ws_amz.append([sku, total])
+        for sku, data in stock_map.items():
+            ws_amz.append([sku, data['total']])
 
         for ws in wb.worksheets:
             for col in ws.columns:
