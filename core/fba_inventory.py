@@ -678,12 +678,16 @@ class FIFOEngine:
 class ExcelReportExporter:
     @staticmethod
     def export_master_excel(file_path: str, db: DatabaseManager):
+        import time
+        genel_baslangic = time.time()
+
+        # --- 1. Veri Okuma ve FIFO Hesaplaması ---
         raw_shipments = db.get_all_shipments_sorted_by_date()
         stock_map = db.get_amazon_stock_map()
         sirali_list, analiz_list = FIFOEngine.calculate_fifo(raw_shipments, stock_map)
-
         analiz_sku_counts = Counter(item.sku for item in analiz_list)
 
+        # --- 2. Excel Still Tanımlamaları ---
         wb = openpyxl.Workbook()
         wb.remove(wb.active)
 
@@ -705,6 +709,7 @@ class ExcelReportExporter:
         green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
         green_font = Font(name="Segoe UI", size=10, bold=True, color="006100")
 
+        # --- 3. SIRALI Tablosu ---
         ws_sirali = wb.create_sheet(title="SIRALI")
         headers_sirali = ["SHIPMENT NAME", "SHIPMENT ID", "DATE", "SKU", "QTY", "EXP DATE USA", "EXP DATE TUR", "SKT GÜN", "AMZ Stok Gün"]
         ws_sirali.append(headers_sirali)
@@ -715,14 +720,14 @@ class ExcelReportExporter:
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        for item in sirali_list:
+        for idx, item in enumerate(sirali_list):
             row_vals = [
                 item['shipment_name'], item['shipment_id'], item['created_date'],
                 item['sku'], item['qty_shipped'], item['exp_date_usa'],
                 item['exp_date_tur'], item['days_remaining'], item['amz_stock_days']
             ]
             ws_sirali.append(row_vals)
-            curr_row = ws_sirali.max_row
+            curr_row = idx + 2  # max_row taraması iptal edildi, statik sayaç eklendi
 
             for col in range(1, 10):
                 c = ws_sirali.cell(row=curr_row, column=col)
@@ -733,6 +738,7 @@ class ExcelReportExporter:
                 else:
                     c.alignment = Alignment(horizontal="center", vertical="center")
 
+        # --- 4. ANALİZ Tablosu ---
         ws_analiz = wb.create_sheet(title="ANALİZ")
         headers_analiz = ["SHIPMENT NAME", "SHIPMENT ID", "SKU", "UNFULFILLABLE", "QTY", "AMZ STOK", "AMZ STOK GÜN", "SKT GÜN", "NOT"]
         ws_analiz.append(headers_analiz)
@@ -743,14 +749,14 @@ class ExcelReportExporter:
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        for item in analiz_list:
+        for idx, item in enumerate(analiz_list):
             row_vals = [
                 item.shipment_name, item.shipment_id, item.sku, item.unfulfillable,
                 item.qty_shipped, item.amz_stock_allocated,
                 item.amz_stock_days, item.days_remaining, item.note
             ]
             ws_analiz.append(row_vals)
-            curr_row = ws_analiz.max_row
+            curr_row = idx + 2
 
             sku_cell = ws_analiz.cell(row=curr_row, column=3)
             unfill_cell = ws_analiz.cell(row=curr_row, column=4)
@@ -763,8 +769,7 @@ class ExcelReportExporter:
             else:
                 sku_cell.font = regular_font
 
-            # Unfulfillable değeri 0'dan büyükse kırmızı (alert) işaretle
-            if item.unfulfillable > 0:
+            if getattr(item, 'unfulfillable', 0) > 0:
                 unfill_cell.fill = alert_fill
                 unfill_cell.font = alert_font
             else:
@@ -779,20 +784,19 @@ class ExcelReportExporter:
             stock_cell.fill = green_fill
             stock_cell.font = bold_font
 
-            # 4. Stil döngüsü aralığını 10'a çıkar (9 sütun için 1-9)
             for col in range(1, 10):
                 c = ws_analiz.cell(row=curr_row, column=col)
                 if col not in [3, 4, 6, 8] or (col == 3 and analiz_sku_counts[item.sku] <= 1) or (
-                        col == 4 and item.unfulfillable <= 0) or (col == 8 and item.days_remaining > 180):
+                        col == 4 and getattr(item, 'unfulfillable', 0) <= 0) or (col == 8 and item.days_remaining > 180):
                     c.font = regular_font
                 c.border = border_thin
 
-                # Hizalamalar: Sütun 9 "NOT" sütunudur.
                 if col in [1, 3, 9]:
                     c.alignment = Alignment(horizontal="left", vertical="center")
                 else:
                     c.alignment = Alignment(horizontal="center", vertical="center")
 
+        # --- 5. AMAZON Tablosu ---
         ws_amz = wb.create_sheet(title="Amazon")
         ws_amz.append(["SKU", "Total Units"])
         for col in range(1, 3):
@@ -803,11 +807,21 @@ class ExcelReportExporter:
         for sku, data in stock_map.items():
             ws_amz.append([sku, data['total']])
 
-        for ws in wb.worksheets:
-            for col in ws.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col)
-                col_letter = get_column_letter(col[0].column)
-                ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+        # --- 6. SÜTUN GENİŞLİKLERİ (ÖLÜMCÜL DARBOĞAZIN ÇÖZÜMÜ) ---
+        # Dinamik 300.000 hücre taraması iptal edildi, sabit genişlikler atandı.
+        column_widths = {
+            "SIRALI": [40, 15, 12, 18, 8, 12, 12, 10, 12],
+            "ANALİZ": [40, 15, 18, 15, 8, 12, 15, 10, 30],
+            "Amazon": [18, 12]
+        }
+        
+        for sheet_name, widths in column_widths.items():
+            if sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                for i, width in enumerate(widths, 1):
+                    ws.column_dimensions[get_column_letter(i)].width = width
 
+        # --- 7. KAYIT ---
         wb.save(file_path)
+
         
