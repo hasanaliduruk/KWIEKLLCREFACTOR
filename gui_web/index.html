@@ -29,7 +29,7 @@
       </div>
       <div class="brand-text">
         <div class="brand-title">Operations Toolkit</div>
-        <div class="brand-sub">v1.3.10 · desktop</div>
+        <div class="brand-sub">v1.3.11 · desktop</div>
       </div>
     </div>
 
@@ -782,10 +782,21 @@
       </div>
 
       <!-- TABS -->
-      <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+      <!-- TABS -->
+      <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
         <button class="fba-tab-btn active" data-target="fba-tab-sirali">SIRALI</button>
         <button class="fba-tab-btn" data-target="fba-tab-analiz">ANALİZ (FIFO)</button>
         <button class="fba-tab-btn" data-target="fba-tab-amz">AMAZON GÜNCEL STOK</button>
+        
+        <!-- YENİ: Sekmelerin Yanındaki Dinamik Yükleyici -->
+        <div id="fba-inline-spinner" style="display: none; align-items: center; margin-left: 10px;">
+           <div class="inline-spinner"></div>
+           <span style="font-size: 11.5px; color: var(--text-faint); margin-left: 6px; font-weight: 600;">İşleniyor...</span>
+        </div>
+
+        <div style="flex: 1;"></div>
+        <!-- Toplam Satır Sayacı -->
+        <div id="fba-row-count" style="font-size: 13px; font-weight: bold; color: var(--accent);">0 Kayıt Listeleniyor</div>
       </div>
 
       <div id="fba-tab-sirali" class="fba-tables active">
@@ -816,11 +827,12 @@
               <th class="sortable-th" data-col="1" data-type="str">SHIPMENT NAME <span class="sort-arrow"></span></th>
               <th class="sortable-th" data-col="2" data-type="str">SHIPMENT ID <span class="sort-arrow"></span></th>
               <th class="sortable-th" data-col="3" data-type="str">SKU <span class="sort-arrow"></span></th>
-              <th class="sortable-th" data-col="4" data-type="num">QTY <span class="sort-arrow"></span></th>
-              <th class="sortable-th" data-col="5" data-type="num">AMZ STOK <span class="sort-arrow"></span></th>
-              <th class="sortable-th" data-col="6" data-type="num">AMZ GÜN <span class="sort-arrow"></span></th>
-              <th class="sortable-th" data-col="7" data-type="num">SKT GÜN <span class="sort-arrow"></span></th>
-              <th data-col="8">NOT</th>
+              <th class="sortable-th" data-col="4" data-type="num">Unfulfillable<span class="sort-arrow"></span></th>
+              <th class="sortable-th" data-col="5" data-type="num">QTY <span class="sort-arrow"></span></th>
+              <th class="sortable-th" data-col="6" data-type="num">AMZ STOK <span class="sort-arrow"></span></th>
+              <th class="sortable-th" data-col="7" data-type="num">AMZ GÜN <span class="sort-arrow"></span></th>
+              <th class="sortable-th" data-col="8" data-type="num">SKT GÜN <span class="sort-arrow"></span></th>
+              <th data-col="9">NOT</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -1034,7 +1046,7 @@
 
       <div class="card">
         <div class="card-title">Current version</div>
-        <div class="update-version" id="updates-current-version">v1.3.10</div>
+        <div class="update-version" id="updates-current-version">v1.3.11</div>
         <p class="muted" style="margin-top:6px;">Your installed version.</p>
       </div>
 
