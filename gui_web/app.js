@@ -1659,6 +1659,7 @@ document.getElementById("cu-run-btn").addEventListener("click", async () => {
   
   // Veriler anlık olarak currentCuSettings objesine senkronize edildiğinden DOM kazımaya gerek yoktur.
   const fileName = isV2 ? "costupdater2_settings.json" : "costupdater_settings.json";
+  const currentCuSettings = isV2 ? currentCuSettingsV2 : currentCuSettingsV1;
   await api().save_settings(fileName, JSON.stringify(currentCuSettings));
   
   prepareJobUI("cu");
