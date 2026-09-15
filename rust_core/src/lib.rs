@@ -23,14 +23,31 @@ fn get_col_idx(headers: &[String], possible_names: Option<&Vec<Value>>) -> Resul
 fn clean_upc(cell: &Data) -> String {
     let s = cell.to_string();
     let s = s.trim();
-    if let Ok(num) = s.parse::<f64>() {
-        if num.fract() == 0.0 {
-            return format!("{:.0}", num);
-        } else {
-            return format!("{}", num);
-        }
+    
+    // Mantıksal Düzeltme: Boş hücreleri anında yoksay, 12 sıfıra dönüşmesini engelle.
+    if s.is_empty() {
+        return String::new();
     }
-    s.to_string()
+
+    let cleaned = if let Ok(num) = s.parse::<f64>() {
+        if num.fract() == 0.0 {
+            format!("{:.0}", num)
+        } else {
+            format!("{}", num)
+        }
+    } else {
+        s.to_string()
+    };
+
+    // Yalnızca dolu veriler 12 haneye tamamlanır.
+    format!("{:0>12}", cleaned)
+}
+
+#[derive(Clone)]
+enum CellValue {
+    Number(f64),
+    Text(String),
+    Empty,
 }
 
 struct ParsedRow {
@@ -39,7 +56,8 @@ struct ParsedRow {
     brand: String,
     case: String,
     qty: Option<f64>,
-    modified_row: Vec<String>,
+    // String yerine kendi enum yapımızı kullanıyoruz
+    modified_row: Vec<CellValue>, 
 }
 
 #[pyfunction]
@@ -170,10 +188,36 @@ pub fn process_restock(
                 let brand = if let Some(i) = r_brand_idx { row.get(i).unwrap_or(&Data::Empty).to_string() } else { "".to_string() };
                 let case = if let Some(i) = r_case_idx { row.get(i).unwrap_or(&Data::Empty).to_string() } else { "".to_string() };
                 
-                let mut modified_row: Vec<String> = row.iter().map(|c| c.to_string()).collect();
+                let mut modified_row: Vec<CellValue> = row.iter().enumerate().map(|(c_idx, c)| {
+                    if c_idx == r_upc_idx {
+                        return CellValue::Text(upc.clone());
+                    }
+                    match c {
+                        Data::Float(f) => CellValue::Number(*f),
+                        Data::Int(i) => CellValue::Number(*i as f64),
+                        Data::String(s) => {
+                            let trimmed = s.trim();
+                            let cleaned = if trimmed.contains(',') && trimmed.contains('.') {
+                                trimmed.replace(',', "")
+                            } else {
+                                trimmed.replace(',', ".")
+                            };
+                            if let Ok(n) = cleaned.parse::<f64>() {
+                                CellValue::Number(n)
+                            } else {
+                                CellValue::Text(trimmed.to_string())
+                            }
+                        },
+                        Data::Empty => CellValue::Empty,
+                        _ => CellValue::Text(c.to_string()),
+                    }
+                }).collect();
+
                 if do_export {
-                    let qty_str = final_qty.map(|q| q.to_string()).unwrap_or_else(|| "#YOK".to_string());
-                    modified_row.insert(insert_idx, qty_str);
+                    let qty_val = final_qty
+                        .map(CellValue::Number)
+                        .unwrap_or_else(|| CellValue::Text("#YOK".to_string()));
+                    modified_row.insert(insert_idx, qty_val);
                 }
 
                 parsed_list.push(ParsedRow { upc, price, brand, case, qty: final_qty, modified_row });
@@ -188,17 +232,19 @@ pub fn process_restock(
                 Ok(())
             }).unwrap().map_err(|e| e.to_string())?;
 
-            Ok((file_path.clone(), priority, prefix, headers, parsed_list))
+            let actual_upc_idx = if do_export && insert_idx <= r_upc_idx { r_upc_idx + 1 } else { r_upc_idx };
+
+            Ok((file_path.clone(), priority, prefix, headers, parsed_list, actual_upc_idx))
         }).collect();
 
         let mut parsed_results = parsed_results_res.map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-        parsed_results.sort_by_key(|(_, priority, _, _, _)| *priority);
+        parsed_results.sort_by_key(|(_, priority, _, _, _, _)| *priority);
 
         Python::try_attach(|py| -> PyResult<()> { log_callback.call1(py, ("Çakışmalar (Deduplication) hesaplanıyor...", 50))?; Ok(()) }).unwrap()?;
         
         let mut lowest_prices: FxHashMap<String, (f64, usize, String, String)> = FxHashMap::default();
         
-        for (file_path, priority, prefix, _, parsed_list) in &parsed_results {
+        for (file_path, priority, prefix, _, parsed_list, _) in &parsed_results {
             for r in parsed_list {
                 let current_entry = lowest_prices.entry(r.upc.clone()).or_insert((r.price, *priority, prefix.clone(), file_path.clone()));
                 if r.price < current_entry.0 || (r.price == current_entry.0 && *priority < current_entry.1) {
@@ -209,12 +255,25 @@ pub fn process_restock(
 
         Python::try_attach(|py| -> PyResult<()> { log_callback.call1(py, ("Ara çıktılar paralel olarak diske yazılıyor...", 60))?; Ok(()) }).unwrap()?;
         
-        let write_results: Result<Vec<_>, String> = parsed_results.par_iter().map(|(file_path, _, prefix, headers, parsed_list)| {
+        let write_results: Result<Vec<_>, String> = parsed_results.par_iter().map(|(file_path, _, prefix, headers, parsed_list, upc_idx)| {
             Python::try_attach(|py| -> PyResult<()> { log_callback.call1(py, ("", None::<i32>))?; Ok(()) }).unwrap().map_err(|e| e.to_string())?;
 
             let file_name = Path::new(file_path).file_name().unwrap().to_string_lossy().to_string();
             let out_path = target_results_dir.join(&file_name);
             let mut out_wb = Workbook::new();
+
+            // Veri ayrıştırma mantığını tamamen güvenli hale getiren closure
+            let parse_cell = |s: &str| -> Option<f64> {
+                let trimmed = s.trim();
+                if trimmed.is_empty() || trimmed == "#YOK" { return None; }
+                
+                let cleaned = if trimmed.contains(',') && trimmed.contains('.') {
+                    trimmed.replace(',', "") // Hem virgül hem nokta varsa virgül binlik ayırıcıdır, ortadan kaldır.
+                } else {
+                    trimmed.replace(',', ".") // Yalnızca virgül varsa ondalık ayırıcıdır, noktaya dönüştür.
+                };
+                cleaned.parse::<f64>().ok()
+            };
 
             if do_export {
                 let ws_exp = out_wb.add_worksheet();
@@ -224,7 +283,20 @@ pub fn process_restock(
                 }
                 for (r_idx, r) in parsed_list.iter().enumerate() {
                     for (c_idx, cell) in r.modified_row.iter().enumerate() {
-                        ws_exp.write_string((r_idx + 1) as u32, c_idx as u16, cell).map_err(|e| e.to_string())?;
+                        if c_idx == *upc_idx { // UPC her zaman metin yazılır
+                            let text_val = match cell {
+                                CellValue::Number(n) => format!("{:.0}", n),
+                                CellValue::Text(s) => s.clone(),
+                                CellValue::Empty => String::new(),
+                            };
+                            ws_exp.write_string((r_idx + 1) as u32, c_idx as u16, &text_val).map_err(|e| e.to_string())?;
+                        } else {
+                            match cell {
+                                CellValue::Number(n) => { ws_exp.write_number((r_idx + 1) as u32, c_idx as u16, *n).map_err(|e| e.to_string())?; },
+                                CellValue::Text(s) => { ws_exp.write_string((r_idx + 1) as u32, c_idx as u16, s).map_err(|e| e.to_string())?; },
+                                CellValue::Empty => {},
+                            }
+                        }
                     }
                 }
             }
@@ -240,7 +312,20 @@ pub fn process_restock(
                 if let Some(winner) = lowest_prices.get(&r.upc) {
                     if &winner.2 == prefix {
                         for (c_idx, cell) in r.modified_row.iter().enumerate() {
-                            ws_dedup.write_string(r_idx, c_idx as u16, cell).map_err(|e| e.to_string())?;
+                            if c_idx == *upc_idx {
+                                let text_val = match cell {
+                                    CellValue::Number(n) => format!("{:.0}", n),
+                                    CellValue::Text(s) => s.clone(),
+                                    CellValue::Empty => String::new(),
+                                };
+                                ws_dedup.write_string(r_idx, c_idx as u16, &text_val).map_err(|e| e.to_string())?;
+                            } else {
+                                match cell {
+                                    CellValue::Number(n) => { ws_dedup.write_number(r_idx, c_idx as u16, *n).map_err(|e| e.to_string())?; },
+                                    CellValue::Text(s) => { ws_dedup.write_string(r_idx, c_idx as u16, s).map_err(|e| e.to_string())?; },
+                                    CellValue::Empty => {},
+                                }
+                            }
                         }
                         r_idx += 1;
                     }
@@ -264,12 +349,12 @@ pub fn process_restock(
             let mut file_order = Vec::new();
             let mut ordered_prefixes = Vec::new();
 
-            for (file_path, _, prefix, _, _) in &parsed_results {
+            for (file_path, _, prefix, _, _, _) in &parsed_results {
                 file_order.push(file_path.clone());
                 ordered_prefixes.push(prefix.clone());
             }
 
-            for (file_path, _, prefix, _, parsed_list) in &parsed_results {
+            for (file_path, _, prefix, _, parsed_list, _) in &parsed_results {
                 for r in parsed_list {
                     pivot_price.entry(r.upc.clone()).or_default().insert(file_path.clone(), r.price);
                     if let Some(q) = r.qty {
@@ -325,8 +410,13 @@ pub fn process_restock(
                 };
 
                 let mut c_idx = 0;
-                for cell in row {
-                    ws.write_string(r_idx, c_idx, &cell.to_string()).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?; c_idx += 1;
+                for (cell_idx, cell) in row.iter().enumerate() {
+                    if cell_idx == m_upc_idx {
+                        ws.write_string(r_idx, c_idx as u16, &upc).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+                    } else {
+                        ws.write_string(r_idx, c_idx as u16, &cell.to_string()).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+                    }
+                    c_idx += 1;
                 }
 
                 let pk_str = row.get(m_pk_idx).unwrap_or(&Data::Empty).to_string().replace("PK", "");

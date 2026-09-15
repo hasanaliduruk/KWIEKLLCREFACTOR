@@ -69,7 +69,7 @@ def extract_price_vectorized(sku_series):
 
 
 def process_costupdater(
-    input_file: str, output_folder: str, settings_content: str, version: int, progress_callback=None
+    input_file: str, output_folder: str, settings_dict: dict, version: int, progress_callback=None
 ) -> dict:
     if not input_file or not os.path.exists(input_file):
         raise FileNotFoundError("Hata: İşlenecek CSV dosyası bulunamadı.")
