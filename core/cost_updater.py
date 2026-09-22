@@ -68,6 +68,13 @@ def extract_price_vectorized(sku_series):
     return sku_series.apply(get_price)
 
 
+def build_numeric_or_marker(values, valid_mask, marker="#YOK"):
+    """Build an object Series so pandas 3 can safely mix numbers and a marker."""
+    result = pd.Series(marker, index=values.index, dtype=object)
+    result.loc[valid_mask] = values.loc[valid_mask].to_numpy()
+    return result
+
+
 def process_costupdater(
     input_file: str, output_folder: str, settings_dict: dict, version: int, progress_callback=None
 ) -> dict:
@@ -79,7 +86,8 @@ def process_costupdater(
 
     if progress_callback:
         progress_callback("Dosya okunuyor...")
-    df = pd.read_csv(input_file)
+    # copy() consolidates the many-column export before calculated columns are added.
+    df = pd.read_csv(input_file).copy()
 
     sku_col = check_columns(df, columns_dictionary["sku"], "sku")
     cost_col = check_columns(df, columns_dictionary["cost"], "cost")
@@ -99,9 +107,12 @@ def process_costupdater(
     # 2. Versiyon Bazlı Optimizasyon (Döngü Yok, O(1) İlişkisel Eşleştirme)
     if version == 1:
         # V1 Hesaplaması
-        df[additional_cost_col] = df["Extracted_DC"].map(maliyet_dictionary).fillna("#YOK")
-        df[cost_col] = "#YOK"
-        df.loc[valid_price_mask, cost_col] = df.loc[valid_price_mask, "Extracted_Price"]
+        mapped_additional_cost = df["Extracted_DC"].map(maliyet_dictionary)
+        df[additional_cost_col] = build_numeric_or_marker(
+            mapped_additional_cost,
+            mapped_additional_cost.notna(),
+        )
+        df[cost_col] = build_numeric_or_marker(df["Extracted_Price"], valid_price_mask)
 
     elif version == 2:
         pkg_volume_col = check_columns(df, columns_dictionary["pkg volume"], "pkg_volume")
@@ -142,12 +153,12 @@ def process_costupdater(
         eq_result = np.where(mask2 & (biggest > 3.0), 0.68, eq_result)
 
         # V2 Nihai Atamalar
-        df[cost_col] = "#YOK"
-        df.loc[valid_price_mask, cost_col] = (
-            df.loc[valid_price_mask, "Extracted_Price"]
-            + eq_result[valid_price_mask]
-            + df.loc[valid_price_mask, "v2_warehouse_fee"]
+        calculated_cost = (
+            df["Extracted_Price"]
+            + eq_result
+            + df["v2_warehouse_fee"]
         )
+        df[cost_col] = build_numeric_or_marker(calculated_cost, valid_price_mask)
         df[additional_cost_col] = df["v2_additional_cost"]
         
         # Merge sonrası oluşan geçici sütunları temizle
