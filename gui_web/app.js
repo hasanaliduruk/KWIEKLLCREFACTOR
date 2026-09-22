@@ -1869,11 +1869,54 @@ const updatesView = {
   install() {
     const asset = this.latestData?.assets.find(a => a.name.endsWith(".exe")) || this.latestData?.assets[0];
     if (!asset) return;
-    document.getElementById("updates-status").textContent = "Downloading…";
+    const status = document.getElementById("updates-status");
+    status.textContent = "Downloading…";
+    status.className = "update-status-text";
     document.getElementById("updates-progress").style.display = "block";
+    const fill = document.getElementById("updates-progress-fill");
+    fill.classList.add("indeterminate");
+    fill.style.width = "35%";
+    document.getElementById("updates-install-btn").disabled = true;
     api().run_download_update(asset.browser_download_url);
   }
 };
+
+window.addEventListener("update-download-progress", e => {
+  const data = e.detail || {};
+  const status = document.getElementById("updates-status");
+  const progress = document.getElementById("updates-progress");
+  const fill = document.getElementById("updates-progress-fill");
+  const installBtn = document.getElementById("updates-install-btn");
+  progress.style.display = "block";
+
+  if (data.error) {
+    fill.classList.remove("indeterminate");
+    fill.style.width = "0%";
+    status.textContent = data.error;
+    status.className = "update-status-text error";
+    if (installBtn) installBtn.disabled = false;
+    return;
+  }
+
+  if (data.indeterminate || !Number.isFinite(data.percent)) {
+    fill.classList.add("indeterminate");
+    fill.style.width = "35%";
+  } else {
+    fill.classList.remove("indeterminate");
+    fill.style.width = `${Math.max(0, Math.min(100, data.percent))}%`;
+  }
+
+  status.className = "update-status-text";
+  if (data.message) {
+    status.textContent = data.message;
+  } else if (data.total > 0) {
+    const downloadedMb = (data.downloaded / 1048576).toFixed(1);
+    const totalMb = (data.total / 1048576).toFixed(1);
+    status.textContent = `Downloading… ${data.percent}% (${downloadedMb} / ${totalMb} MB)`;
+  } else if (data.downloaded > 0) {
+    status.textContent = `Downloading… ${(data.downloaded / 1048576).toFixed(1)} MB`;
+  }
+});
 
 window.addEventListener("update-status", e => {
   const s = document.getElementById("updates-status");
@@ -1888,7 +1931,7 @@ window.addEventListener("update-status", e => {
       // Ekrana sadece "up-to-date" yazdırmak yerine durumu netleştir.
       s.textContent = `Uygulama güncel. (Sunucudaki sürüm: ${e.detail.version})`;
   } else {
-      s.textContent = e.detail.state;
+      s.textContent = e.detail.message || e.detail.state;
   }
 });
 
