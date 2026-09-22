@@ -49,6 +49,19 @@ class UniversalDateParserTests(unittest.TestCase):
             with self.subTest(raw=raw):
                 self.assertEqual(("", "", 0), UniversalDateParser.parse_exp_date(raw))
 
+    def test_created_date_parses_mixed_cell_representations_independently(self):
+        cases = {
+            "19 Jan 2026": "19 Jan 2026",
+            "3 Apr 2026": "3 Apr 2026",
+            datetime(2025, 10, 29): "29 Oct 2025",
+            "31 Jan 2025 10:57:34": "31 Jan 2025",
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                formatted, parsed = UniversalDateParser.parse_created_date(raw)
+                self.assertEqual(expected, formatted)
+                self.assertEqual(expected, parsed.strftime("%d %b %Y").lstrip("0"))
+
 
 if __name__ == "__main__":
     unittest.main()

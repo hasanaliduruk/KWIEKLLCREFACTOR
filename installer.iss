@@ -3,7 +3,7 @@
 ; ============================================================================
 
 #define MyAppName "KWIEK LLC WEBVIEW"
-#define MyAppVersion "1.3.14"
+#define MyAppVersion "1.3.15"
 #define MyAppPublisher "Kwiek LLC"
 #define MyAppURL "https://github.com/hasanaliduruk/KWIEKLLCREFACTOR"
 #define MyAppExeName "OperationsToolkit_Webview.exe"

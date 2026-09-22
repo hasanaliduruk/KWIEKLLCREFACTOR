@@ -178,10 +178,18 @@ class UniversalDateParser:
             dt = datetime.now()
             return dt.strftime("%d %b %Y").lstrip("0"), dt
 
-        val_str = cls._strip_time(date_val)
+        if isinstance(date_val, pd.Timestamp):
+            date_val = date_val.to_pydatetime()
+        if isinstance(date_val, datetime):
+            return date_val.strftime("%d %b %Y").lstrip("0"), date_val
+        if isinstance(date_val, date):
+            dt = datetime.combine(date_val, datetime_time.min)
+            return dt.strftime("%d %b %Y").lstrip("0"), dt
+
+        val_str = cls._strip_time(date_val).strip().rstrip(',;')
 
         try:
-            parsed_dt = pd.to_datetime(val_str, errors='coerce', dayfirst=True)
+            parsed_dt = pd.to_datetime(val_str, errors='coerce', dayfirst=True, format='mixed')
             if pd.notnull(parsed_dt):
                 dt = parsed_dt.to_pydatetime()
                 return dt.strftime("%d %b %Y").lstrip("0"), dt
@@ -512,13 +520,19 @@ class DatabaseManager:
             errors='coerce').fillna(0).astype(int)
 
         if col_date in df.columns:
-            date_clean = df[col_date].astype(str).str.replace(r'\s+\d{1,2}:\d{2}(:\d{2})?.*', '', regex=True)
+            created_values = df[col_date].tolist()
         else:
-            date_clean = pd.Series([''], index=df.index)
+            created_values = [''] * len(df)
 
-        created_series = pd.to_datetime(date_clean, errors='coerce', dayfirst=True).fillna(pd.Timestamp(now))
-        df['__created_dt'] = created_series
-        df['__created_fmt'] = created_series.dt.strftime('%d %b %Y').str.lstrip('0')
+        # pandas 3 uses strict, single-format inference for a Series. A mixed
+        # column (native Excel dates plus strings such as "19 Jan 2026") can
+        # therefore turn valid rows into NaT. Parse every source cell on its own.
+        parsed_created_dates = [
+            UniversalDateParser.parse_created_date(value)
+            for value in created_values
+        ]
+        df['__created_fmt'] = [parsed[0] for parsed in parsed_created_dates]
+        df['__created_dt'] = [parsed[1] for parsed in parsed_created_dates]
 
         if col_exp_usa in df.columns:
             exp_values = df[col_exp_usa].tolist()
