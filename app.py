@@ -5,7 +5,6 @@ app.py — Desktop entry point for the webview version of the app.
 import os
 import sys
 import json
-import socket
 import tempfile
 import subprocess
 from threading import Thread, Event, Lock
@@ -34,9 +33,9 @@ from core.invoice_finder import process_invoice_finder, process_invoice_finder_u
 from core.expiration_processor import process_expiration
 from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
 from core.pk_extractor import PKExtractorEngine
+from core import updater_service
 
-CURRENT_VERSION = "v1.3.15"
-GITHUB_API_URL = "https://api.github.com/repos/hasanaliduruk/KWIEKLLCREFACTOR/releases/latest"
+CURRENT_VERSION = "v1.3.16"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -930,36 +929,13 @@ class Api:
         return CURRENT_VERSION
     
     def check_internet(self):
-        try:
-            socket.create_connection(("8.8.8.8", 53), timeout=5)
-            return True
-        except OSError:
-            return False
+        return updater_service.check_internet()
 
     def get_latest_release(self):
-        try:
-            r = requests.get(GITHUB_API_URL, timeout=10)
-            r.raise_for_status()
-            return r.json()
-        except Exception:
-            return None
+        return updater_service.get_latest_release()
 
     def download_update_file(self, url, destination, progress_callback=None):
-        try:
-            r = requests.get(url, stream=True, timeout=20)
-            r.raise_for_status()
-            total = int(r.headers.get("content-length", 0))
-            downloaded = 0
-            with open(destination, "wb") as f:
-                for chunk in r.iter_content(chunk_size=4096):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if progress_callback and total > 0:
-                            progress_callback(downloaded, total)
-            return True
-        except Exception:
-            return False
+        return updater_service.download_update_file(url, destination, progress_callback)
 
     def prepare_and_run_batch(self, update_exe_path):
         temp_dir = tempfile.gettempdir()
@@ -976,12 +952,9 @@ class Api:
 
     def run_check_for_updates(self):
         def worker():
-            if not self.check_internet():
-                self._emit("update-status", {"state": "no-internet"})
-                return
-            data = self.get_latest_release()
-            if not data:
-                self._emit("update-status", {"state": "check-failed"})
+            data, error = updater_service.get_latest_release_details()
+            if error:
+                self._emit("update-status", error)
                 return
             latest = data.get("tag_name", "")
             if version.parse(latest) > version.parse(CURRENT_VERSION):
@@ -998,10 +971,8 @@ class Api:
     def run_silent_update_check(self):
         def worker():
             time.sleep(1)
-            if not self.check_internet():
-                return
-            data = self.get_latest_release()
-            if not data:
+            data, error = updater_service.get_latest_release_details()
+            if error:
                 return
             latest = data.get("tag_name", "")
             if version.parse(latest) > version.parse(CURRENT_VERSION):
@@ -1021,10 +992,20 @@ class Api:
                 temp_path = os.path.join(tempfile.gettempdir(), "OperationsToolkit_Setup.exe")
                 
                 def progress(dl, total):
-                    pct = round(dl / total * 100) if total > 0 else 0
-                    self._emit("update-download-progress", {"percent": pct, "downloaded": dl, "total": total})
+                    if total > 0:
+                        pct = min(99, round(dl / total * 100))
+                        self._emit("update-download-progress", {
+                            "percent": pct, "downloaded": dl, "total": total,
+                        })
+                    else:
+                        self._emit("update-download-progress", {
+                            "percent": None, "downloaded": dl, "total": 0,
+                            "indeterminate": True,
+                        })
                 
-                self._emit("update-download-progress", {"percent": 0, "message": "Starting download…"})
+                self._emit("update-download-progress", {
+                    "percent": 0, "message": "Starting download…", "indeterminate": True,
+                })
                 ok = self.download_update_file(url, temp_path, progress_callback=progress)
                 
                 if not ok:
