@@ -3,7 +3,7 @@ import os
 import sys
 import re
 import sqlite3
-from datetime import datetime, date
+from datetime import datetime, date, time as datetime_time, timedelta
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional, Set, Any
 from collections import Counter
@@ -67,6 +67,111 @@ class UniversalDateParser:
         val_str = str(val).strip()
         return re.sub(r'\s+\d{1,2}:\d{2}(:\d{2})?.*', '', val_str)
 
+    @staticmethod
+    def _expand_two_digit_year(year: int) -> int:
+        """Use an expiry-friendly pivot instead of platform-dependent %y rules."""
+        if year < 100:
+            return 2000 + year if year <= 79 else 1900 + year
+        return year
+
+    @staticmethod
+    def _date_order_from_number_format(number_format: Optional[str]) -> Optional[str]:
+        """Return the leading date-field order from an Excel number format."""
+        if not number_format:
+            return None
+        fmt = re.sub(r'\[[^\]]*\]|"[^"]*"|\\.', '', str(number_format)).lower()
+        tokens = re.findall(r'[dmy]+', fmt)
+        if len(tokens) < 2:
+            return None
+        first, second = tokens[0][0], tokens[1][0]
+        if {first, second} == {'d', 'm'}:
+            return first + second
+        return None
+
+    @classmethod
+    def _coerce_expiration_datetime(
+        cls, date_val: Any, number_format: Optional[str] = None
+    ) -> Optional[datetime]:
+        """Parse an American expiry date while respecting Excel cell metadata.
+
+        Master files mix text, native Excel dates, separators and two-digit years.
+        A native date with a day-first display format needs special treatment: Excel
+        may already have interpreted an originally-entered MM/DD value as DD/MM.
+        Re-reading its displayed components as American recovers the intended date.
+        """
+        if date_val is None or pd.isna(date_val):
+            return None
+
+        if isinstance(date_val, pd.Timestamp):
+            date_val = date_val.to_pydatetime()
+
+        if isinstance(date_val, (datetime, date)):
+            dt = datetime.combine(date_val, datetime_time.min) if isinstance(date_val, date) and not isinstance(date_val, datetime) else date_val
+            if cls._date_order_from_number_format(number_format) == 'dm':
+                # The displayed DD/MM components came from an American MM/DD input.
+                try:
+                    return datetime(dt.year, dt.day, dt.month)
+                except ValueError:
+                    return dt
+            return dt
+
+        if isinstance(date_val, (int, float)) and not isinstance(date_val, bool):
+            if 1 <= float(date_val) <= 2958465:
+                try:
+                    return datetime(1899, 12, 30) + timedelta(days=float(date_val))
+                except (OverflowError, ValueError):
+                    return None
+            return None
+
+        text = str(date_val).strip().strip("'\"")
+        text = text.replace('\u00a0', ' ').replace('\t', ' ').strip().rstrip(',;')
+        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'[T ]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:\s*[AP]M)?(?:Z|[+-]\d{2}:?\d{2})?$', '', text, flags=re.IGNORECASE)
+        if not text or text.lower() in {'nan', 'nat', 'none', 'null'}:
+            return None
+
+        # ISO is unambiguous and must not be interpreted as month-first.
+        match = re.fullmatch(r'(\d{4})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{1,2})', text)
+        if match:
+            try:
+                return datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            except ValueError:
+                return None
+
+        # Numeric American dates: M/D/Y, M-D-Y or M.D.Y (2- or 4-digit year).
+        match = re.fullmatch(r'(\d{1,2})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{2}|\d{4})', text)
+        if match:
+            month, day, year = map(int, match.groups())
+            try:
+                return datetime(cls._expand_two_digit_year(year), month, day)
+            except ValueError:
+                return None
+
+        # Compact American dates such as 123125 or 12312025.
+        match = re.fullmatch(r'(\d{2})(\d{2})(\d{2}|\d{4})', text)
+        if match:
+            month, day, year = map(int, match.groups())
+            try:
+                return datetime(cls._expand_two_digit_year(year), month, day)
+            except ValueError:
+                return None
+
+        # Month-name dates are unambiguous (e.g. "12 Dec 2025" or "Dec 12, 25").
+        if re.search(r'[A-Za-z]', text):
+            parsed = pd.to_datetime(text, errors='coerce')
+            if pd.notnull(parsed):
+                return parsed.to_pydatetime()
+
+        # Numeric strings can be Excel serials when the cell was formatted General.
+        if re.fullmatch(r'\d+(?:\.\d+)?', text):
+            serial = float(text)
+            if 1 <= serial <= 2958465:
+                try:
+                    return datetime(1899, 12, 30) + timedelta(days=serial)
+                except (OverflowError, ValueError):
+                    pass
+        return None
+
     @classmethod
     def parse_created_date(cls, date_val: Any) -> Tuple[str, datetime]:
         if pd.isna(date_val) or date_val is None:
@@ -87,21 +192,14 @@ class UniversalDateParser:
         return dt.strftime("%d %b %Y").lstrip("0"), dt
 
     @classmethod
-    def parse_exp_date(cls, date_val: Any) -> Tuple[str, str, int]:
+    def parse_exp_date(cls, date_val: Any, number_format: Optional[str] = None) -> Tuple[str, str, int]:
         if pd.isna(date_val) or date_val is None:
             return "", "", 0
 
-        val_str = cls._strip_time(date_val)
-        dt = None
-        try:
-            parsed_dt = pd.to_datetime(val_str, errors='coerce')
-            if pd.notnull(parsed_dt):
-                dt = parsed_dt.to_pydatetime()
-        except Exception:
-            pass
+        dt = cls._coerce_expiration_datetime(date_val, number_format)
 
         if dt is None:
-            return val_str, val_str, 0
+            return "", "", 0
 
         exp_usa = dt.strftime("%m-%d-%Y")
         exp_tur = dt.strftime("%d.%m.%Y")
@@ -423,16 +521,46 @@ class DatabaseManager:
         df['__created_fmt'] = created_series.dt.strftime('%d %b %Y').str.lstrip('0')
 
         if col_exp_usa in df.columns:
-            exp_clean = df[col_exp_usa].astype(str).str.replace(r'\s+\d{1,2}:\d{2}(:\d{2})?.*', '', regex=True)
+            exp_values = df[col_exp_usa].tolist()
         else:
-            exp_clean = pd.Series([''], index=df.index)
+            exp_values = [''] * len(df)
 
-        exp_series = pd.to_datetime(exp_clean, errors='coerce')
+        # pandas preserves most values but not the Excel display format needed to
+        # recover ambiguous dates that Excel auto-converted using a local locale.
+        exp_number_formats = [None] * len(df)
+        if col_exp_usa in df.columns:
+            try:
+                wb_meta = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                ws_meta = wb_meta[target_sheet]
+                exp_col_idx = cols.index(col_exp_usa) + 1
+                wanted_indices = {int(idx) for idx in df.index}
+                formats_by_index = {}
+                for excel_row, cells in enumerate(
+                    ws_meta.iter_rows(min_row=2, min_col=exp_col_idx, max_col=exp_col_idx),
+                    start=2,
+                ):
+                    frame_index = excel_row - 2
+                    if frame_index in wanted_indices:
+                        formats_by_index[frame_index] = cells[0].number_format
+                    if len(formats_by_index) == len(wanted_indices):
+                        break
+                exp_number_formats = [formats_by_index.get(int(idx)) for idx in df.index]
+                wb_meta.close()
+            except Exception:
+                # Parsing still works for text/native dates if metadata is unavailable.
+                exp_number_formats = [None] * len(df)
 
-        df['__exp_usa'] = exp_series.dt.strftime('%m-%d-%Y').fillna("")
-        df['__exp_tur'] = exp_series.dt.strftime('%d.%m.%Y').fillna("")
-
-        df['__days_remaining'] = (exp_series.dt.normalize() - pd.Timestamp(now).normalize()).dt.days.fillna(0).astype(int)
+        parsed_expirations = [
+            UniversalDateParser.parse_exp_date(value, number_format)
+            for value, number_format in zip(exp_values, exp_number_formats)
+        ]
+        df['__exp_usa'] = [parsed[0] for parsed in parsed_expirations]
+        df['__exp_tur'] = [parsed[1] for parsed in parsed_expirations]
+        df['__days_remaining'] = [parsed[2] for parsed in parsed_expirations]
+        invalid_expiration_count = sum(
+            1 for value, parsed in zip(exp_values, parsed_expirations)
+            if pd.notna(value) and str(value).strip().lower() not in {'', 'nan', 'nat', 'none', 'null'} and not parsed[0]
+        )
 
         records = df[[col_id, col_name, col_sku, '__qty', '__created_dt', '__created_fmt', '__exp_usa', '__exp_tur', '__days_remaining']].to_dict('records')
 
@@ -532,7 +660,8 @@ class DatabaseManager:
 
             conn.commit()
 
-        return True, f"Master Excel verileri başarıyla yüklendi. ({rows_imported} satır eksiksiz aktarıldı, {len(notes_dict)} adet açıklama notu işlendi)"
+        warning = f", {invalid_expiration_count} tarih okunamadı" if invalid_expiration_count else ""
+        return True, f"Master Excel verileri başarıyla yüklendi. ({rows_imported} satır aktarıldı, {len(notes_dict)} adet açıklama notu işlendi{warning})"
 
     def add_picklist_shipment(self, header: ShipmentHeader, items: List[ItemInfoRow]):
         with self.get_connection() as conn:
@@ -823,5 +952,3 @@ class ExcelReportExporter:
 
         # --- 7. KAYIT ---
         wb.save(file_path)
-
-        
