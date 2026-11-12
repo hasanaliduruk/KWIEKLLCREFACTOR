@@ -844,6 +844,7 @@ function showResult(bannerId, ok, message, outputPath) {
 const TOOLS = [
   { btn: "conv-run-btn", cancelBtn: "conv-cancel-btn", log: "conv-log", dot: "conv-dot", status: "conv-status-text", result: "conv-result", fill: "conv-progress-fill", console: "conv-console" },
   { btn: "tsv-run-btn", cancelBtn: "tsv-cancel-btn", log: "tsv-log", dot: "tsv-dot", status: "tsv-status-text", result: "tsv-result", fill: null, console: "tsv-console" },
+  { btn: "tc-run-btn", cancelBtn: "tc-cancel-btn", log: "tc-log", dot: "tc-dot", status: "tc-status-text", result: "tc-result", fill: null, console: "tc-console" },
   { btn: "cu-run-btn", cancelBtn: "cu-cancel-btn", log: "cu-log", dot: "cu-dot", status: "cu-status-text", result: "cu-result", fill: null, console: "cu-console" },
   { btn: "rs-run-btn", cancelBtn: "rs-cancel-btn", log: "rs-log", dot: "rs-dot", status: "rs-status-text", result: "rs-result", fill: "rs-progress-fill", console: "rs-console" },
   { btn: "fp-run-btn", cancelBtn: "fp-cancel-btn", log: "fp-log", dot: "fp-dot", status: "fp-status-text", result: "fp-result", fill: null, console: "fp-console" },
@@ -939,6 +940,27 @@ document.getElementById("tsv-run-btn").addEventListener("click", async () => {
   if (!tsvZone.files.length) return toast("Drop at least one file to convert.");
   prepareJobUI("tsv");
   await api().run_tsv(tsvZone.files, outputFolder, document.getElementById("tsv-save-name").value.trim() || "Converted_File");
+});
+
+// Title Cleaner
+const tcZone = new FileDropZone({ zoneId: "tc-dropzone", listId: "tc-file-list", multiple: false, fileTypes: ["Excel Workbooks (*.xlsx)", "All files (*.*)"], accept: (p) => p.toLowerCase().endsWith(".xlsx") });
+const tcOverride = document.getElementById("tc-override-toggle");
+tcOverride.addEventListener("change", () => {
+  document.getElementById("tc-destination-card").style.display = tcOverride.checked ? "none" : "";
+});
+document.getElementById("tc-run-btn").addEventListener("click", async () => {
+  const outputFolder = document.getElementById("tc-output-folder").value.trim();
+  if (!tcZone.files.length) return toast("Choose an .xlsx workbook first.");
+  if (!tcOverride.checked && !outputFolder) return toast("Pick a destination folder first.");
+  if (activeTool()) return toast("Another job is running. Wait for it to finish.");
+  prepareJobUI("tc");
+  const started = await api().run_title_cleaner(tcZone.files[0], outputFolder, tcOverride.checked);
+  if (!started) {
+    document.getElementById("tc-run-btn").disabled = false;
+    document.getElementById("tc-cancel-btn").style.display = "none";
+    setStatus("tc-dot", "tc-status-text", "error", "Busy");
+    toast("Another job is running. Wait for it to finish.");
+  }
 });
 
 // =======================================================================
@@ -1852,6 +1874,8 @@ const updatesView = {
   async init() {
     this.currentVersion = await api().get_current_version();
     const vEl = document.getElementById("updates-current-version"); if (vEl) vEl.textContent = this.currentVersion;
+    const sidebarVersion = document.getElementById("sidebar-version");
+    if (sidebarVersion) sidebarVersion.textContent = `${this.currentVersion} · desktop`;
     document.getElementById("updates-check-btn")?.addEventListener("click", () => this.check());
     document.getElementById("updates-install-btn")?.addEventListener("click", () => this.install());
     document.getElementById("updates-notes-btn")?.addEventListener("click", () => {

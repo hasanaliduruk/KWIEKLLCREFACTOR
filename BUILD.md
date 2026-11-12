@@ -70,9 +70,8 @@ build_shared.bat
 
 ## Version
 
-The app version is the `CURRENT_VERSION` constant in `app.py` (e.g. `v1.2.5`).
-The repo-root `version.txt` is a **PyInstaller version resource file** — it
-embeds Windows file properties (company name, description, file version) into
-the built exe via the `version='../version.txt'` line in `build_webview.spec`.
-It is NOT a plain version string; do not edit it as one. `installer.iss` has
-its own `MyAppVersion` that must be bumped in lockstep. See `RELEASE.md`.
+Edit only the repo-root `VERSION` file (for example, `1.3.18`, without `v`).
+`app.py` reads it at startup, the webview labels use the Python API, and
+`installer.iss` reads it at compile time. `build_webview.spec` renders the
+Windows EXE properties from the `version.txt` template and the same `VERSION`.
+See `RELEASE.md`.

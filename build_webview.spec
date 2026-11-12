@@ -6,18 +6,28 @@
 #   - upx=False on purpose: UPX-packed executables are a well-known Windows
 #     Defender false-positive trigger. If you want a smaller bundle AND have
 #     a code-signing certificate, sign the output instead of packing it.
-#   - version file: embeds Windows file properties (company, description,
-#     version) from the repo-root version.txt.
+#   - VERSION is the single source for the app and Windows file properties.
 #
 # Run with:  pyinstaller build_webview.spec --clean
 
+from pathlib import Path
+
+from core.versioning import read_version, render_version_resource
+
+
 block_cipher = None
+release_version = read_version()
+resource_template = Path('version.txt').read_text(encoding='utf-8')
+generated_resource = Path('build') / 'generated_webview_version.txt'
+generated_resource.parent.mkdir(exist_ok=True)
+generated_resource.write_text(render_version_resource(resource_template, release_version), encoding='utf-8')
 
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
     datas=[
+        ('VERSION', '.'),
         ('gui_web', 'gui_web'),
         ('core', 'core'),
         ('utils', 'utils'),
@@ -66,7 +76,7 @@ exe = EXE(
     upx=False,
     console=False,
     icon='assets/icon.ico',
-    version='version.txt',
+    version=str(generated_resource),
 )
 
 coll = COLLECT(

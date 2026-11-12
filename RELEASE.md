@@ -7,9 +7,9 @@ one — no manual unzip/reinstall).
 ## How the in-app updater works
 
 1. On startup (and via the **Check for Updates** button) the app calls the
-   GitHub Releases API for `hasali2603/KWIEKLLCREFACTOR`.
+   GitHub Releases API for `hasanaliduruk/KWIEKLLCREFACTOR`.
 2. It compares the latest release `tag_name` (e.g. `v1.2.5`) with the bundled
-   `CURRENT_VERSION` in `app.py`.
+   version read from the repo-root `VERSION` file.
 3. If a newer release exists, the Updates view shows the version, release
    notes, and an **Install Update** button.
 4. Clicking it downloads the **setup installer** asset from the release and
@@ -22,12 +22,11 @@ one — no manual unzip/reinstall).
 ## Building a new release (step by step)
 
 ### 1. Bump the version
-- Edit `CURRENT_VERSION` in `app.py` (e.g. `"v1.2.5"`).
-- Edit `MyAppVersion` in `installer.iss` to match (without the `v`).
-- Edit `currentVersion` in `gui_web/app.js` (the Updates view badge) to match.
-- (Optional) Edit the `FileVersion`/`ProductVersion` strings in the repo-root
-  `version.txt` — that file is the PyInstaller **version resource** that
-  embeds Windows file properties into the exe, not the app version string.
+- Edit only the repo-root `VERSION` file (for example, `1.3.18`, without `v`).
+  The app, both version labels, the installer, and the Windows EXE metadata
+  read this value during startup or build. The `version.txt` file is a template.
+- Create the release tag with the matching `v` prefix (for example, `v1.3.18`).
+  The release workflow stops if the tag differs from `VERSION`.
 
 ### 2. Build the app
 ```
@@ -45,7 +44,7 @@ Install [Inno Setup](https://jrsoftware.org/isdl.php) (free), then compile
 This produces `Output\OperationsToolkit_Setup.exe` (bundles the onedir folder).
 
 ### 4. Publish the GitHub release
-- Create a new release tagged `v1.2.5` on GitHub.
+- Create a new release tagged to match `VERSION` (with the `v` prefix) on GitHub.
 - Upload `Output\OperationsToolkit_Setup.exe` as a release asset.
 - Write the changelog in the release body (it shows in the app's notes modal).
 
