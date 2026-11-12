@@ -26,6 +26,10 @@ jobs:
         python-version: '3.13'
         cache: 'pip'
 
+    - name: Verify release tag matches VERSION
+      if: startsWith(github.ref, 'refs/tags/')
+      run: python -c "from core.versioning import read_version; import sys; expected = 'v' + read_version(); actual = sys.argv[1]; assert actual == expected, f'Release tag {actual} does not match VERSION {expected}'" "${{ github.ref_name }}"
+
     - name: Install Stable Rust Toolchain
       uses: dtolnay/rust-toolchain@stable
 

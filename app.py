@@ -33,9 +33,12 @@ from core.invoice_finder import process_invoice_finder, process_invoice_finder_u
 from core.expiration_processor import process_expiration
 from core.fba_inventory import DatabaseManager, ShipmentIDExtractor, PicklistParser, ExcelReportExporter, FIFOEngine
 from core.pk_extractor import PKExtractorEngine
+from core.title_cleaner import clean_product_title
+from core.title_workbook import process_title_cleaner
+from core.versioning import read_version
 from core import updater_service
 
-CURRENT_VERSION = "v1.3.16"
+CURRENT_VERSION = f"v{read_version()}"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -583,6 +586,48 @@ class Api:
             return {"ok": False, "message": str(e)}
 
     # -- İşlem Yürütme Modülleri (Thread-Safe ve İptal Destekli) --
+
+    def run_title_cleaner(self, input_file, output_folder, override_original=False):
+        if not self._job_lock.acquire(blocking=False):
+            return False
+
+        self._reset_cancel_flag()
+
+        def progress(message):
+            if self._cancel_event.is_set():
+                raise InterruptedError("İşlem iptal edildi.")
+            self._emit("job-log", {"message": message})
+
+        def worker():
+            try:
+                started_at = time.perf_counter()
+                self._emit("job-log", {"message": f"Kaynak dosya: {os.path.basename(input_file)}"})
+                self._emit("job-log", {"message": (
+                    "Çıkış biçimi: kaynak dosya güncellenecek."
+                    if override_original else "Çıkış biçimi: yeni Excel dosyası oluşturulacak."
+                )})
+                result = process_title_cleaner(
+                    input_file, output_folder, clean_product_title, progress,
+                    override_original=override_original,
+                )
+                stats = result["stats"]
+                self._emit("job-log", {"message": (
+                    f"Özet: {stats['rows']:,} satır tarandı; {stats['changed']:,} başlık sadeleştirildi; "
+                    f"{stats['blank']:,} boş başlık; {stats['no_identity']:,} ürün kimliği bulunamayan satır."
+                ), "color": "#90EE90"})
+                self._emit("job-log", {"message": f"Çıktı: {result['file_path']}"})
+                self._emit("job-log", {"message": f"Toplam süre: {time.perf_counter() - started_at:.1f} saniye."})
+                message = f"{os.path.basename(result['file_path'])}: {result['message']}"
+                self._emit("job-done", {"ok": True, "message": message, "output_path": result["output_path"]})
+            except InterruptedError:
+                self._emit("job-done", {"ok": False, "message": "İşlem kullanıcı tarafından durduruldu."})
+            except Exception as error:
+                self._emit("job-done", {"ok": False, "message": str(error)})
+            finally:
+                self._job_lock.release()
+
+        Thread(target=worker, daemon=True).start()
+        return True
 
     def run_converter(self, files, output_folder, input_type, output_type):
         if not self._job_lock.acquire(blocking=False):

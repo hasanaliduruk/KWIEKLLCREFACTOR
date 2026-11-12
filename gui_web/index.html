@@ -29,7 +29,7 @@
       </div>
       <div class="brand-text">
         <div class="brand-title">Operations Toolkit</div>
-        <div class="brand-sub">v1.3.16 · desktop</div>
+        <div class="brand-sub" id="sidebar-version">desktop</div>
       </div>
     </div>
 
@@ -61,6 +61,10 @@
     <div class="nav-item" data-view="converter" title="Converter">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h7l3 3v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><path d="M14 7v3h3"/></svg>
       <span class="nav-label">Converter</span>
+    </div>
+    <div class="nav-item" data-view="titlecleaner" title="Title Cleaner">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h11M4 18h8"/><path d="m16 17 2 2 3-4"/></svg>
+      <span class="nav-label">Title Cleaner</span>
     </div>
 
     <div class="nav-group-label" data-label="Pricing">Pricing</div>
@@ -231,6 +235,54 @@
         <div class="console-body" id="tsv-log"></div>
       </div>
       <div class="result-banner" id="tsv-result"></div>
+    </section>
+
+    <!-- TITLE CLEANER VIEW -->
+    <section class="view" id="view-titlecleaner">
+      <div class="view-header">
+        <h1 class="view-title">Title Cleaner</h1>
+        <p class="view-desc">Create or refresh New Title beside Title while keeping product identity and size.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Product workbook</div>
+        <div class="dropzone" id="tc-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <div class="dropzone-text"><strong>Drop an Excel workbook here</strong> or click to browse</div>
+          <div class="dropzone-hint">single-sheet .xlsx with Title; an existing New Title is refreshed</div>
+        </div>
+        <div class="file-list" id="tc-file-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Output</div>
+        <div class="switch-row">
+          <span class="switch-label">Override the original file</span>
+          <label class="switch">
+            <input type="checkbox" id="tc-override-toggle" checked>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <p class="muted" id="tc-override-hint" style="margin-top:6px;">The selected workbook, including any existing New Title values, will be updated in place.</p>
+      </div>
+      <div class="card" id="tc-destination-card" style="display:none;">
+        <div class="card-title">Save a new file</div>
+        <div class="field">
+          <label class="field-label" for="tc-output-folder">Destination folder</label>
+          <div class="input-row">
+            <input type="text" id="tc-output-folder" placeholder="C:/Users/you/Desktop/sonuc" />
+            <button class="btn" data-browse-folder="tc-output-folder">Browse</button>
+          </div>
+          <p class="muted" style="margin-top:6px;">A new workbook is saved; the source file stays in place.</p>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-danger" id="tc-cancel-btn" style="display:none;">Cancel</button>
+        <button class="btn btn-primary" id="tc-run-btn">Clean Titles</button>
+      </div>
+      <div class="console" id="tc-console">
+        <div class="console-head"><span class="console-dot" id="tc-dot"></span><span id="tc-status-text">Idle</span></div>
+        <div class="console-body" id="tc-log"></div>
+      </div>
+      <div class="result-banner" id="tc-result"></div>
     </section>
 
     <!-- ---------------------------------------------------------------- -->
@@ -1046,7 +1098,7 @@
 
       <div class="card">
         <div class="card-title">Current version</div>
-        <div class="update-version" id="updates-current-version">v1.3.16</div>
+        <div class="update-version" id="updates-current-version">Loading…</div>
         <p class="muted" style="margin-top:6px;">Your installed version.</p>
       </div>
 
