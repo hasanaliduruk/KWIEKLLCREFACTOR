@@ -28,7 +28,7 @@ app.py / main()
 - 11 Kasım hız ölçümü: 52.394 satırlı dosyada Excel okuma/yazma tabanı yaklaşık 14,8 saniye, eski toplam yaklaşık 38 saniye idi. Marka eşleştirmesi önbelleği ve gereksiz düzenli ifade taramalarını atlama ile toplam yaklaşık 24,2 saniyeye indi; 52.394 satırın `New Title` çıktısı önceki sürümle birebir karşılaştırıldı. Rust'a taşıma bu aşamada yapılmadı; kalan maliyetin büyük bölümü Excel okuma/yazma ve kuralların yalnızca yaklaşık 9 saniyelik kısmıdır.
 - Title Cleaner ekranının yerleşimi diğer araçlarla aynı tutuldu. Alttaki mevcut konsol kaynak dosya/çıkış türü, sütun doğrulaması, 2.000 satırlık ilerleme, kaydetme, özet, dosya yolu ve toplam süre adımlarını gösterir. `process_title_cleaner` sonuç sözlüğündeki `stats` alanı bu özet için kullanılır.
 - `rust_core/src/lib.rs`: PyO3 ile Python'a açılan Rust Restock motoru. `.github/workflows/release.yml` bunu `maturin` ile derleyip kuruyor.
-- Sürümün tek kaynağı kökteki `VERSION` dosyasıdır (`1.3.17` gibi, `v` öneki olmadan). `app.py` çalışma anında, `installer.iss` derleme anında bunu okur; `gui_web/app.js` iki sürüm etiketini Python API'den doldurur. `build_webview.spec`, `version.txt` şablonundan Windows EXE sürüm kaynağını üretir ve `VERSION` dosyasını pakete ekler. Release iş akışı etiketin `v` + `VERSION` ile eşleşmesini denetler.
+- Sürümün tek kaynağı kökteki `VERSION` dosyasıdır (`1.3.18` gibi, `v` öneki olmadan). `app.py` çalışma anında, `installer.iss` derleme anında bunu okur; `gui_web/app.js` iki sürüm etiketini Python API'den doldurur. `build_webview.spec`, `version.txt` şablonundan Windows EXE sürüm kaynağını üretir ve `VERSION` dosyasını pakete ekler. Release iş akışı etiketin `v` + `VERSION` ile eşleşmesini denetler.
 
 ## Ekran → köprü → iş mantığı
 
