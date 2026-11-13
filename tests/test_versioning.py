@@ -30,6 +30,6 @@ class VersioningTests(unittest.TestCase):
     def test_invalid_version_is_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "VERSION"
-            path.write_text("v1.3.17\n", encoding="utf-8")
+            path.write_text("v1.3.18\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "major.minor.patch"):
                 read_version(path)
