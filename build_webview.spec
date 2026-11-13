@@ -10,8 +10,11 @@
 #
 # Run with:  pyinstaller build_webview.spec --clean
 
+import sys
 from pathlib import Path
 
+ROOT = Path(SPECPATH).resolve()
+sys.path.insert(0, str(ROOT))
 from core.versioning import read_version, render_version_resource
 
 
