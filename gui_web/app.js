@@ -1890,10 +1890,17 @@ const updatesView = {
     document.getElementById("updates-status").textContent = "Checking…";
     await api().run_check_for_updates();
   },
+  getInstallAsset() {
+    return this.latestData?.assets?.find(a => a.name.endsWith(".exe")) || this.latestData?.assets?.[0] || null;
+  },
   install() {
-    const asset = this.latestData?.assets.find(a => a.name.endsWith(".exe")) || this.latestData?.assets[0];
-    if (!asset) return;
+    const asset = this.getInstallAsset();
     const status = document.getElementById("updates-status");
+    if (!asset) {
+      status.textContent = "The latest release has no downloadable installer attached.";
+      status.className = "update-status-text warn";
+      return;
+    }
     status.textContent = "Downloading…";
     status.className = "update-status-text";
     document.getElementById("updates-progress").style.display = "block";
@@ -1947,10 +1954,13 @@ window.addEventListener("update-status", e => {
   document.getElementById("updates-check-btn").disabled = false;
   
   if(e.detail.state === "update-available") { 
-      s.textContent = `New version available: ${e.detail.version}`; 
-      document.getElementById("updates-install-btn").style.display = ""; 
+      updatesView.latestData = e.detail;
+      const hasInstaller = Boolean(updatesView.getInstallAsset());
+      s.textContent = hasInstaller
+        ? `New version available: ${e.detail.version}`
+        : `New version available: ${e.detail.version}, but no installer is attached to the release.`;
+      document.getElementById("updates-install-btn").style.display = hasInstaller ? "" : "none";
       document.getElementById("updates-notes-btn").style.display = ""; 
-      updatesView.latestData = e.detail; 
   } else if (e.detail.state === "up-to-date") {
       // Ekrana sadece "up-to-date" yazdırmak yerine durumu netleştir.
       s.textContent = `Uygulama güncel. (Sunucudaki sürüm: ${e.detail.version})`;
@@ -1962,6 +1972,7 @@ window.addEventListener("update-status", e => {
 window.addEventListener("update-badge", e => {
   const data = e.detail;
   updatesView.latestData = data;
+  const hasInstaller = Boolean(updatesView.getInstallAsset());
   
   const updateNavItem = document.querySelector('.nav-item[data-view="updates"]');
   if (updateNavItem) {
@@ -1970,9 +1981,13 @@ window.addEventListener("update-badge", e => {
   const s = document.getElementById("updates-status");
   const b = document.getElementById("update-badge");
   if (b) { b.classList.add("visible"); b.innerHTML = data.version; }
-  if (s) s.textContent = `New version available: ${data.version}`;
+  if (s) {
+    s.textContent = hasInstaller
+      ? `New version available: ${data.version}`
+      : `New version available: ${data.version}, but no installer is attached to the release.`;
+  }
   const installBtn = document.getElementById("updates-install-btn");
-  if (installBtn) installBtn.style.display = "";
+  if (installBtn) installBtn.style.display = hasInstaller ? "" : "none";
   const notesBtn = document.getElementById("updates-notes-btn");
   if (notesBtn) notesBtn.style.display = "";
   
